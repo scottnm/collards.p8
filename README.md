@@ -1,2 +1,3 @@
 # collards.p8
-Pico8 Game for "Classic Collards" Game Jam
+
+Our (yet-to-be-titled) pico-8 game for the "Classic Collards" Game Jam
