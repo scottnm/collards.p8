@@ -52,6 +52,11 @@ function _init()
 end
 
 function _update()
+    -- get input
+    g_input = poll_input(g_input)
+
+    update_timer(g_input)
+
     -- handle the block state
     if g_player_found_exit_timer != nil then
         g_player_found_exit_timer += 1
@@ -62,8 +67,6 @@ function _update()
         return
     end
 
-    -- get input
-    g_input = poll_input(g_input)
     if g_input.btn_o and g_input.btn_o_change then
         -- flip the player tile
         flip_player_tile()
@@ -108,6 +111,7 @@ function _draw()
         print("FOUND EXIT", 0, 5)
     end
 
+    draw_timer()
 end
 
 function advance_level()
