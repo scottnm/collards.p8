@@ -1,24 +1,4 @@
--- main file for sweep.p8
-
--- Enums
-Colors = {
-    Black = 0,
-    Navy = 1,
-    Maroon = 2,
-    DarkGreen = 3,
-    Brown = 4,
-    DarkGray = 5,
-    LightGray = 6,
-    White = 7,
-    Red = 8,
-    Orange = 9,
-    Yellow = 10,
-    LightGreen = 11,
-    SkyBlue = 12,
-    BlueGray = 13,
-    Pink = 14,
-    Tan = 15,
-}
+-- main.lua - main game logic
 
 TileType = {
     Empty = 1,
@@ -28,10 +8,6 @@ TileType = {
 -- constants
 function TILE_SIZE()
     return 16
-end
-
-function SCREEN_SIZE()
-    return 128
 end
 
 function MAX_TILE_LINE()
@@ -45,8 +21,10 @@ g_map = nil
 g_player_pos = nil
 g_input = nil
 g_player_found_exit_timer = nil
+g_ingame_timer = nil
 
 function _init()
+    g_ingame_timer = make_timer()
     -- noop
     advance_level()
 end
@@ -55,7 +33,8 @@ function _update()
     -- get input
     g_input = poll_input(g_input)
 
-    update_timer(g_input)
+    -- update our in-game accelerated timer UI
+    g_ingame_timer.update(g_input)
 
     -- handle the block state
     if g_player_found_exit_timer != nil then
@@ -111,7 +90,7 @@ function _draw()
         print("FOUND EXIT", 0, 5)
     end
 
-    draw_timer()
+    g_ingame_timer.draw()
 end
 
 function advance_level()
@@ -152,13 +131,9 @@ function generate_tile()
     return { visible = false, type = TileType.Empty }
 end
 
-function rndrange_inc(lower, upper)
-    return flr(rnd(upper - lower)) + lower
-end
-
 function generate_random_map_position()
-    local x = rndrange_inc(1, g_map_size.width)
-    local y = rndrange_inc(1, g_map_size.height)
+    local x = rnd_incrange(1, g_map_size.width)
+    local y = rnd_incrange(1, g_map_size.height)
     return { x = x, y = y }
 end
 
@@ -174,49 +149,6 @@ function get_tile_color(tile)
     else
         return Colors.Brown
     end
-end
-
-function poll_input(input)
-    if input == nil then
-        input = {
-            btn_left = false,
-            btn_left_change = false,
-            btn_right = false,
-            btn_right_change = false,
-            btn_up = false,
-            btn_up_change = false,
-            btn_down = false,
-            btn_down_change = false,
-            btn_o = false,
-            btn_o_change = false,
-            btn_x = false,
-            btn_x_change = false,
-        }
-    end
-
-    local new_input = {
-        btn_left = btn(0),
-        btn_right = btn(1),
-        btn_up = btn(2),
-        btn_down = btn(3),
-        btn_o = btn(4),
-        btn_x = btn(5),
-    }
-
-    input.btn_left_change = (input.btn_left ~= new_input.btn_left)
-    input.btn_left = new_input.btn_left
-    input.btn_right_change = (input.btn_right ~= new_input.btn_right)
-    input.btn_right = new_input.btn_right
-    input.btn_up_change = (input.btn_up ~= new_input.btn_up)
-    input.btn_up = new_input.btn_up
-    input.btn_down_change = (input.btn_down ~= new_input.btn_down)
-    input.btn_down = new_input.btn_down
-    input.btn_o_change = (input.btn_o ~= new_input.btn_o)
-    input.btn_o = new_input.btn_o
-    input.btn_x_change = (input.btn_x ~= new_input.btn_x)
-    input.btn_x = new_input.btn_x
-
-    return input
 end
 
 function flip_player_tile()
@@ -249,8 +181,3 @@ function move_player(input)
     g_player_pos.x = clamp(1, g_player_pos.x + movement.x, g_map_size.width)
     g_player_pos.y = clamp(1, g_player_pos.y + movement.y, g_map_size.height)
 end
-
-function clamp(lower, value, upper)
-    return mid(lower, value, upper)
-end
-

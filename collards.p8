@@ -5,3 +5,4 @@ __lua__
 -- run the main game
 #include main.lua
 #include timer.lua
+#include utils.lua

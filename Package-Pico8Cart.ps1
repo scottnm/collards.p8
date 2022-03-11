@@ -17,8 +17,9 @@ $tmpLuaFile = (Get-Item $OutputCartName).BaseName + ".lua"
 rm $tmpLuaFile -ErrorAction SilentlyContinue
 
 # verify all of the includes are there
-foreach ($cartInclude in $cartIncludes.Matches)
+for ($i = 0; $i -lt $cartIncludes.Matches.Count; $i++)
 {
+    $cartInclude = $cartIncludes.Matches[$i]
     $luaFile = $cartInclude.Groups[1].Value
     $luaPath = Join-Path $Cart.DirectoryName $luaFile
     if (! (Test-Path $luaPath))
@@ -27,7 +28,10 @@ foreach ($cartInclude in $cartIncludes.Matches)
     }
 
     Write-Host -foregroundcolor cyan "Packaging... $luaFile"
-    echo "-- $luaFile" >> $tmpLuaFile
+    if ($i -ne 0)
+    {
+        echo "-->8" >> $tmpLuaFile
+    }
     cat $luaPath >> $tmpLuaFile
     echo "" >> $tmpLuaFile
 }
