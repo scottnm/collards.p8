@@ -3,6 +3,7 @@
 TileType = {
     Empty = 1,
     Finish = 2,
+    Trap = 3,
 }
 
 -- constants
@@ -15,18 +16,19 @@ function MAX_TILE_LINE()
 end
 
 -- global variables
-g_level = nil
-g_map_size = nil
+g_maps = nil
 g_map = nil
 g_player_pos = nil
 g_input = nil
 g_player_found_exit_timer = nil
+g_player_respawn_timer = nil
 g_ingame_timer = nil
 
 function _init()
-    g_ingame_timer = make_timer()
-    -- noop
-    advance_level()
+    g_ingame_timer = make_ui_timer()
+
+    g_maps = {}
+    move_to_level(1)
 end
 
 function _update()
@@ -38,36 +40,53 @@ function _update()
 
     -- handle the block state
     if g_player_found_exit_timer != nil then
-        g_player_found_exit_timer += 1
-        if g_player_found_exit_timer >= 60 then -- 2 seconds
+        g_player_found_exit_timer.update()
+        if g_player_found_exit_timer.done() then
             g_player_found_exit_timer = nil
-            advance_level()
+            move_to_level(g_map.level_id + 1)
+        end
+        return
+    elseif g_player_respawn_timer != nil then
+        g_player_respawn_timer.update()
+        if g_player_respawn_timer.done() then
+            g_player_respawn_timer = nil
+            move_to_level(1)
         end
         return
     end
 
+    move_player(g_input)
+
+    local player_tile = g_map.cells[g_player_pos.y][g_player_pos.x]
+
+    -- potentially flip the player tile
     if g_input.btn_o and g_input.btn_o_change then
-        -- flip the player tile
-        flip_player_tile()
+        player_tile.visible = true
     end
 
-    move_player(g_input)
+    if player_tile.visible then
+        if player_tile.type == TileType.Finish then
+            g_player_found_exit_timer = make_ingame_timer(60)
+        elseif player_tile.type == TileType.Trap then
+            g_player_respawn_timer = make_ingame_timer(60)
+        end
+    end
 end
 
 function _draw()
     cls(Colors.BLACK)
 
     -- draw the tiles
-    local map_pixel_width = g_map_size.width * TILE_SIZE()
-    local map_pixel_height = g_map_size.height * TILE_SIZE()
+    local map_pixel_width = g_map.width * TILE_SIZE()
+    local map_pixel_height = g_map.height * TILE_SIZE()
     -- offsets to draw the map in the center of the board
     local pixel_row_offset = flr((SCREEN_SIZE() - map_pixel_height) / 2)
     local pixel_col_offset = flr((SCREEN_SIZE() - map_pixel_width) / 2)
 
     -- draw base map
-    for row=0,g_map_size.height-1 do
-        for col=0,g_map_size.width-1 do
-            local tile = g_map[row+1][col+1]
+    for row=0,g_map.height-1 do
+        for col=0,g_map.width-1 do
+            local tile = g_map.cells[row+1][col+1]
             local tile_x0 = col * TILE_SIZE() + pixel_col_offset
             local tile_x1 = tile_x0 + TILE_SIZE() - 1
             local tile_y0 = row * TILE_SIZE() + pixel_row_offset
@@ -85,56 +104,92 @@ function _draw()
     rect(player_tile_x0, player_tile_y0, player_tile_x1, player_tile_y1, Colors.White)
 
     -- print the level
-    print("Level: "..g_level, 0, 0)
+    print("Level: "..g_map.level_id, 0, 120)
     if g_player_found_exit_timer != nil then
-        print("FOUND EXIT", 0, 5)
+        print("FOUND EXIT", 100, 120)
+    elseif g_player_respawn_timer != nil then
+        print("DIED", 100, 120)
     end
 
     g_ingame_timer.draw()
 end
 
-function advance_level()
-    -- update the level
-    if g_level != nil then
-        g_level += 1
-    else
-        g_level = 1
+function move_to_level(next_level)
+    -- if we've already visited this level, use it rather than generating a new level
+    if g_maps[next_level] != nil then
+        g_map = g_maps[next_level]
+        g_player_pos = copy_pos(g_map.player_start)
+        return
     end
 
+    -- generate a new map
+    local next_map = {}
+    next_map.level_id = next_level
+
     -- update the map size
-    if g_map_size != nil then
-        g_map_size.width = min(g_map_size.width + 1, MAX_TILE_LINE())
-        g_map_size.height = min(g_map_size.height + 1, MAX_TILE_LINE())
+    if g_maps[next_level - 1] != nil then
+        local prev_map = g_maps[next_level - 1]
+        next_map.width =  min(prev_map.width + 1, MAX_TILE_LINE())
+        next_map.height = min(prev_map.height + 1, MAX_TILE_LINE())
     else
-        g_map_size = { width = 4, height = 4 }
+        next_map.width = 4
+        next_map.height = 4
     end
 
     -- generate the map
-    g_map = {}
-    for row=1,g_map_size.height do
-        add(g_map, {})
-        for col=1,g_map_size.width do
-            add(g_map[row], generate_tile())
+    next_map.cells = {}
+    for row=1,next_map.height do
+        add(next_map.cells, {})
+        for col=1,next_map.width do
+            add(next_map.cells[row], generate_rnd_tile())
         end
     end
 
-    -- place the player
-    g_player_pos = generate_random_map_position()
+    -- generate the player start position
+    next_map.player_start = select_random_empty_map_position(next_map)
+    next_map.cells[next_map.player_start.y][next_map.player_start.x] = make_tile(true, TileType.Empty)
 
     -- place the finish
-    local finish_point = generate_random_map_position()
-    g_map[finish_point.y][finish_point.x].type = TileType.Finish
+    local finish_point = select_random_empty_map_position(next_map)
+    next_map.cells[finish_point.y][finish_point.x] = make_tile(false, TileType.Finish)
+
+    g_maps[next_level] = next_map
+    g_map = next_map
+
+    -- place the player
+    g_player_pos = next_map.player_start
+    g_player_pos = copy_pos(next_map.player_start)
 end
 
-function generate_tile()
-    -- TODO: actually generate interesting tiles. For now just generate empty/safe tiles
-    return { visible = false, type = TileType.Empty }
+function generate_rnd_tile()
+    -- TODO: better tile generation (or maybe using predefined maps?)
+    if rnd() < 0.3 then
+        return make_tile(false, TileType.Trap)
+    else
+        return make_tile(false, TileType.Empty)
+    end
+
 end
 
-function generate_random_map_position()
-    local x = rnd_incrange(1, g_map_size.width)
-    local y = rnd_incrange(1, g_map_size.height)
-    return { x = x, y = y }
+function make_tile(visible, tile_type)
+    return { visible = visible, type = tile_type }
+end
+
+function select_random_empty_map_position(map)
+    local choice_cnt = 0
+    local choices = {}
+    for y=1,map.height do
+        for x=1,map.width do
+            local tile = map.cells[y][x]
+            if tile.type == TileType.Empty then
+                add(choices, { x = x, y = y })
+                choice_cnt += 1
+            end
+        end
+    end
+
+    local rnd_choice_index = rnd_incrange(1, choice_cnt)
+    return choices[rnd_choice_index]
 end
 
 function get_tile_color(tile)
@@ -143,24 +198,13 @@ function get_tile_color(tile)
             return Colors.Tan
         elseif tile.type == TileType.Finish then
             return Colors.LightGreen
+        elseif tile.type == TileType.Trap then
+            return Colors.Red
         else
             return nil
         end
     else
         return Colors.Brown
-    end
-end
-
-function flip_player_tile()
-    local tile = g_map[g_player_pos.y][g_player_pos.x]
-    if tile.visible then
-        -- tile already visible. do nothing
-        return
-    end
-
-    tile.visible = true
-    if tile.type == TileType.Finish then
-        g_player_found_exit_timer = 0
     end
 end
 
@@ -178,6 +222,10 @@ function move_player(input)
         return
     end
 
-    g_player_pos.x = clamp(1, g_player_pos.x + movement.x, g_map_size.width)
-    g_player_pos.y = clamp(1, g_player_pos.y + movement.y, g_map_size.height)
+    g_player_pos.x = clamp(1, g_player_pos.x + movement.x, g_map.width)
+    g_player_pos.y = clamp(1, g_player_pos.y + movement.y, g_map.height)
+end
+
+function copy_pos(pos)
+    return { x = pos.x, y = pos.y }
 end

@@ -1,6 +1,27 @@
--- timer.lua - UI timers
+-- timer.lua - timers
 
-function make_timer()
+function make_ingame_timer(num_frames)
+    local self = {
+        frames_left = num_frames
+    }
+
+    local update = function()
+        if self.frames_left != 0 then
+            self.frames_left -= 1
+        end
+    end
+
+    local done = function()
+        return self.frames_left == 0
+    end
+
+    return {
+        update = update,
+        done = done
+    }
+end
+
+function make_ui_timer()
     local self = {
         timer_blink = 0,
         timer_blink_period = 25,
@@ -45,9 +66,18 @@ function make_timer()
     end
 
     local update_timer = function (input)
-        if input.btn_o and input.btn_o_change and self.real_time_ticks == nil then
-            self.real_time_ticks = 0
-            self.timer_blink = nil
+        if self.real_time_ticks == nil then
+            local any_btn_change = (input.btn_left_change or
+               input.btn_right_change or
+               input.btn_up_change or
+               input.btn_down_change or
+               input.btn_o_change or
+               input.btn_x_change)
+
+            if any_btn_change then
+                self.real_time_ticks = 0
+                self.timer_blink = nil
+            end
         end
 
         if self.timer_blink != nil then
@@ -69,8 +99,8 @@ function make_timer()
         if not hide_timer_for_blink then
             local should_flash = should_flash_time(self.real_time_ticks)
             local text_color = Colors.White
-            local text_pos_x = 64
-            local text_pos_y = 64
+            local text_pos_x = 42
+            local text_pos_y = 10
             if should_flash and (blink_state == nil) then
                 text_color = Colors.Yellow
                 -- add shake to timer
