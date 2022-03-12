@@ -31,12 +31,20 @@ function _init()
     g_anims = {
         IdleDown = create_anim_flow(34, 1, 10, 2, false),
         WalkDown = create_anim_flow(32, 3, 10, 2, false),
-        IdleRight = create_anim_flow(2, 1, 10, 2, false),
-        WalkRight = create_anim_flow(0, 3, 10, 2, false),
-        IdleLeft = create_anim_flow(2, 1, 10, 2, true),
-        WalkLeft = create_anim_flow(0, 3, 10, 2, true),
         IdleUp = create_anim_flow(40, 1, 10, 2, false),
         WalkUp = create_anim_flow(38, 3, 10, 2, false),
+        IdleRight = create_anim_flow(66, 1, 10, 2, false),
+        WalkRight = create_anim_flow(64, 3, 10, 2, false),
+        IdleLeft = create_anim_flow(66, 1, 10, 2, true),
+        WalkLeft = create_anim_flow(64, 3, 10, 2, true),
+        IdleUpRight = create_anim_flow(8, 1, 10, 2, false),
+        WalkUpRight = create_anim_flow(6, 3, 10, 2, false),
+        IdleDownRight = create_anim_flow(2, 1, 10, 2, false),
+        WalkDownRight = create_anim_flow(0, 3, 10, 2, false),
+        IdleUpLeft = create_anim_flow(8, 1, 10, 2, true),
+        WalkUpLeft = create_anim_flow(6, 3, 10, 2, true),
+        IdleDownLeft = create_anim_flow(2, 1, 10, 2, true),
+        WalkDownLeft = create_anim_flow(0, 3, 10, 2, true),
     }
     g_ingame_timer = make_ui_timer()
 
@@ -247,9 +255,21 @@ end
 function animate_player(input)
     local anim = nil
     if g_input.btn_left then
-        anim = g_anims.WalkLeft
+        if g_input.btn_up then
+            anim = g_anims.WalkUpLeft
+        elseif g_input.btn_down then
+            anim = g_anims.WalkDownLeft
+        else
+            anim = g_anims.WalkLeft
+        end
     elseif g_input.btn_right then
-        anim = g_anims.WalkRight
+        if g_input.btn_up then
+            anim = g_anims.WalkUpRight
+        elseif g_input.btn_down then
+            anim = g_anims.WalkDownRight
+        else
+            anim = g_anims.WalkRight
+        end
     elseif g_input.btn_up then
         anim = g_anims.WalkUp
     elseif g_input.btn_down then
@@ -263,6 +283,14 @@ function animate_player(input)
             anim = g_anims.IdleUp
         elseif g_player.anim_state.last_flow == g_anims.WalkDown then
             anim = g_anims.IdleDown
+        elseif g_player.anim_state.last_flow == g_anims.WalkUpLeft then
+            anim = g_anims.IdleUpLeft
+        elseif g_player.anim_state.last_flow == g_anims.WalkUpRight then
+            anim = g_anims.IdleUpRight
+        elseif g_player.anim_state.last_flow == g_anims.WalkDownLeft then
+            anim = g_anims.IdleDownLeft
+        elseif g_player.anim_state.last_flow == g_anims.WalkDownRight then
+            anim = g_anims.IdleDownRight
         else
             anim = g_player.anim_state.last_flow
         end
