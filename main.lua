@@ -19,13 +19,25 @@ end
 -- global variables
 g_maps = nil
 g_map = nil
-g_player_pos = nil
+g_player = nil
 g_input = nil
 g_player_found_exit_timer = nil
 g_player_respawn_timer = nil
 g_ingame_timer = nil
+g_anims = nil
 
 function _init()
+    g_player = {}
+    g_anims = {
+        IdleDown = create_anim_flow(34, 1, 10, 2, false),
+        WalkDown = create_anim_flow(32, 3, 10, 2, false),
+        IdleRight = create_anim_flow(2, 1, 10, 2, false),
+        WalkRight = create_anim_flow(0, 3, 10, 2, false),
+        IdleLeft = create_anim_flow(2, 1, 10, 2, true),
+        WalkLeft = create_anim_flow(0, 3, 10, 2, true),
+        IdleUp = create_anim_flow(40, 1, 10, 2, false),
+        WalkUp = create_anim_flow(38, 3, 10, 2, false),
+    }
     g_ingame_timer = make_ui_timer()
 
     g_maps = {}
@@ -57,8 +69,9 @@ function _update()
     end
 
     move_player(g_input)
+    animate_player(g_input)
 
-    local player_tile = g_map.cells[g_player_pos.y][g_player_pos.x]
+    local player_tile = g_map.cells[g_player.pos.y][g_player.pos.x]
 
     -- potentially flip the player tile
     if g_input.btn_o and g_input.btn_o_change then
@@ -98,28 +111,34 @@ function _draw()
     end
 
     -- draw player position
-    local player_tile_x0 = (g_player_pos.x-1) * TILE_SIZE() + pixel_col_offset
-    local player_tile_x1 = player_tile_x0 + TILE_SIZE() - 1
-    local player_tile_y0 = (g_player_pos.y-1) * TILE_SIZE() + pixel_row_offset
-    local player_tile_y1 = player_tile_y0 + TILE_SIZE() - 1
-    rect(player_tile_x0, player_tile_y0, player_tile_x1, player_tile_y1, Colors.White)
+    local player_tile_x = (g_player.pos.x-1) * TILE_SIZE() + pixel_col_offset
+    local player_tile_y = (g_player.pos.y-1) * TILE_SIZE() + pixel_row_offset
+    draw_anim(g_player, { x = player_tile_x, y = player_tile_y })
 
     -- print the level
-    print("Level: "..g_map.level_id, 0, 120)
+    print("Level: "..g_map.level_id, 0, 120, Colors.White)
     if g_player_found_exit_timer != nil then
-        print("FOUND EXIT", 100, 120)
+        print("FOUND EXIT", 100, 120, Colors.White)
     elseif g_player_respawn_timer != nil then
-        print("DIED", 100, 120)
+        print("DIED", 100, 120, Colors.White)
     end
 
     g_ingame_timer.draw()
 end
 
 function move_to_level(next_level)
+    -- update the current map
+    change_level(next_level)
+
+    -- reset the player to the start of that map
+    g_player.pos = copy_pos(g_map.player_start)
+    update_anim(g_player, g_anims.IdleDown)
+end
+
+function change_level(next_level)
     -- if we've already visited this level, use it rather than generating a new level
     if g_maps[next_level] != nil then
         g_map = g_maps[next_level]
-        g_player_pos = copy_pos(g_map.player_start)
         return
     end
 
@@ -156,10 +175,6 @@ function move_to_level(next_level)
 
     g_maps[next_level] = next_map
     g_map = next_map
-
-    -- place the player
-    g_player_pos = next_map.player_start
-    g_player_pos = copy_pos(next_map.player_start)
 end
 
 function generate_rnd_tile()
@@ -225,8 +240,35 @@ function move_player(input)
         return
     end
 
-    g_player_pos.x = clamp(1, g_player_pos.x + movement.x, g_map.width)
-    g_player_pos.y = clamp(1, g_player_pos.y + movement.y, g_map.height)
+    g_player.pos.x = clamp(1, g_player.pos.x + movement.x, g_map.width)
+    g_player.pos.y = clamp(1, g_player.pos.y + movement.y, g_map.height)
+end
+
+function animate_player(input)
+    local anim = nil
+    if g_input.btn_left then
+        anim = g_anims.WalkLeft
+    elseif g_input.btn_right then
+        anim = g_anims.WalkRight
+    elseif g_input.btn_up then
+        anim = g_anims.WalkUp
+    elseif g_input.btn_down then
+        anim = g_anims.WalkDown
+    else
+        if g_player.anim_state.last_flow == g_anims.WalkLeft then
+            anim = g_anims.IdleLeft
+        elseif g_player.anim_state.last_flow == g_anims.WalkRight then
+            anim = g_anims.IdleRight
+        elseif g_player.anim_state.last_flow == g_anims.WalkUp then
+            anim = g_anims.IdleUp
+        elseif g_player.anim_state.last_flow == g_anims.WalkDown then
+            anim = g_anims.IdleDown
+        else
+            anim = g_player.anim_state.last_flow
+        end
+    end
+
+    update_anim(g_player, anim)
 end
 
 function copy_pos(pos)
