@@ -6,8 +6,14 @@ functionality. I currently prefer this flow for multi-file lua stuff rather than
 #>
 Param(
     [Parameter(Mandatory=$true)][string]$Path,
-    [Parameter(Mandatory=$false)][string]$OutputCartName = "proto.p8"
+    [Parameter(Mandatory=$false)][string]$PrototypeLabel = "1",
+    [Parameter(Mandatory=$false)][string]$OutputCartName
 )
+
+if (!$OutputCartName)
+{
+    $OutputCartName = "proto_$PrototypeLabel.p8"
+}
 
 $Cart = Get-Item $Path
 $cartIncludes = sls "#include\s+([A-Za-z_]+.lua)" $Cart.FullName
