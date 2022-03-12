@@ -2,8 +2,9 @@
 
 TileType = {
     Empty = 1,
-    Finish = 2,
-    Trap = 3,
+    Start = 2,
+    Finish = 3,
+    Trap = 4,
 }
 
 -- constants
@@ -147,7 +148,7 @@ function move_to_level(next_level)
 
     -- generate the player start position
     next_map.player_start = select_random_empty_map_position(next_map)
-    next_map.cells[next_map.player_start.y][next_map.player_start.x] = make_tile(true, TileType.Empty)
+    next_map.cells[next_map.player_start.y][next_map.player_start.x] = make_tile(true, TileType.Start)
 
     -- place the finish
     local finish_point = select_random_empty_map_position(next_map)
@@ -195,6 +196,8 @@ end
 function get_tile_color(tile)
     if tile.visible then
         if tile.type == TileType.Empty then
+            return Colors.Tan
+        elseif tile.type == TileType.Start then
             return Colors.Tan
         elseif tile.type == TileType.Finish then
             return Colors.LightGreen
