@@ -1,4 +1,6 @@
 -- main.lua - main game logic
+-- TODO: if possible remove 'iso' from all unnecessary names before checkin and remove all non-iso equivalents
+-- TODO: add the border to the lower iso cells
 
 TileType = {
     Empty = 1,
@@ -8,12 +10,16 @@ TileType = {
 }
 
 -- constants
-function TILE_SIZE()
+function ISO_TILE_WIDTH()
+    return 32
+end
+
+function ISO_TILE_HEIGHT()
     return 16
 end
 
 function MAX_TILE_LINE()
-    return SCREEN_SIZE() /  TILE_SIZE()
+    return 4
 end
 
 -- global variables
@@ -29,10 +35,10 @@ g_anims = nil
 function _init()
     g_player = {}
     g_player.collider = {
+        -- FIXME: separate out the player's collider from their base position
         pos = { x = 0, y = 0 },
-        sprite_offset = { x = -4, y = -12 },
-        width = 6,
-        height = 4,
+        sprite_offset = { x = -8, y = -14 },
+        radius = 3,
     }
 
     g_anims = {
@@ -86,19 +92,19 @@ function _update()
     move_player(g_input)
     animate_player(g_input)
 
-    local player_tile_idx = get_player_tile_idx(g_map, g_player)
-    if player_tile_idx != nil then
-        local player_tile = g_map.cells[player_tile_idx.y][player_tile_idx.x]
+    local player_iso_tile_idx = get_player_iso_tile_idx(g_map, g_player)
+    if player_iso_tile_idx != nil then
+        local player_iso_tile = g_map.isocells[player_iso_tile_idx].tile
         -- potentially flip the player tile
         if g_input.btn_o and g_input.btn_o_change then
-            player_tile.visible = true
+            player_iso_tile.visible = true
         end
 
-        if player_tile.visible then
-            if player_tile.type == TileType.Finish then
-                g_player_found_exit_timer = make_ingame_timer(60)
-            elseif player_tile.type == TileType.Trap then
-                g_player_respawn_timer = make_ingame_timer(60)
+        if player_iso_tile.visible then
+            if player_iso_tile.type == TileType.Finish then
+                g_player_found_exit_timer = make_ingame_timer(15)
+            elseif player_iso_tile.type == TileType.Trap then
+                g_player_respawn_timer = make_ingame_timer(30)
             end
         end
     end
@@ -110,29 +116,16 @@ function _draw()
     --
     -- draw the tiles
     --
-    local map_pixel_width = g_map.width_in_tiles * TILE_SIZE()
-    local map_pixel_height = g_map.height_in_tiles * TILE_SIZE()
-    -- offsets to draw the map in the center of the board
-    local pixel_row_offset = flr((SCREEN_SIZE() - map_pixel_height) / 2)
-    local pixel_col_offset = flr((SCREEN_SIZE() - map_pixel_width) / 2)
 
-    -- draw base map
-    for row=0,g_map.height_in_tiles-1 do
-        for col=0,g_map.width_in_tiles-1 do
-            local tile = g_map.cells[row+1][col+1]
-            local tile_x0 = col * TILE_SIZE() + g_map.pos.x
-            local tile_x1 = tile_x0 + TILE_SIZE() - 1
-            local tile_y0 = row * TILE_SIZE() + g_map.pos.y
-            local tile_y1 = tile_y0 + TILE_SIZE() - 1
-
-            rectfill(tile_x0, tile_y0, tile_x1, tile_y1, get_tile_color(tile))
-        end
+    -- draw iso map
+    for isocell in all(g_map.isocells) do
+        local frame_idx = get_iso_tile_sprite_frame(isocell.tile)
+        spr(frame_idx, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
     end
 
-    -- highlight player's current tile
-    local player_tile_idx = get_player_tile_idx(g_map, g_player)
-    if player_tile_idx != nil then
-        highlight_player_tile(g_map, player_tile_idx)
+    local player_iso_tile_idx = get_player_iso_tile_idx(g_map, g_player)
+    if player_iso_tile_idx != nil then
+        highlight_player_iso_tile(g_map, player_iso_tile_idx)
     end
 
     --
@@ -157,14 +150,28 @@ function _draw()
     -- draw the in-game timer UI
     --
     g_ingame_timer.draw()
+
+    -- uncomment to draw colliders on top of everything
+    --circ(g_player.collider.pos.x, g_player.collider.pos.y, g_player.collider.radius, Colors.White)
+    --for cell in all(g_map.isocells) do
+    --    circ(cell.pos.x, cell.pos.y, cell.collider.radius, Colors.White)
+    --end
+
+    -- uncomment to dump frame stats
+    print("mem:  "..stat(0), 80, 80, Colors.White)
+    print("cpu:  "..stat(1), 80, 90, Colors.White)
+    print("fps(t): "..stat(8), 80, 100, Colors.White)
+    print("fps(a): "..stat(7), 80, 110, Colors.White)
 end
 
 function move_to_level(next_level)
     -- update the current map
     change_level(next_level)
 
-    -- reset the player to the start of that map
-    g_player.collider.pos = get_pos_to_center_on_tile(g_map, g_map.player_start_tile, g_player.collider.width, g_player.collider.height)
+    -- center the player's collider on the center of the iso tile
+    g_player.collider.pos = copy_pos(g_map.isocells[g_map.player_start_iso_idx].pos)
+
+    -- reset the player's animation
     update_anim(g_player, g_anims.IdleDown)
 end
 
@@ -182,107 +189,127 @@ function change_level(next_level)
     -- update the map size
     if g_maps[next_level - 1] != nil then
         local prev_map = g_maps[next_level - 1]
-        next_map.width_in_tiles =  min(prev_map.width_in_tiles + 1, MAX_TILE_LINE())
-        next_map.height_in_tiles = min(prev_map.height_in_tiles + 1, MAX_TILE_LINE())
+        next_map.iso_width = min(prev_map.iso_width + 1, MAX_TILE_LINE())
     else
-        next_map.width_in_tiles = 4
-        next_map.height_in_tiles = 4
+        next_map.iso_width = 2
     end
 
-    -- calculate the map's position so it's centered on the screen.
-    local map_size = calc_map_size(next_map)
-    local pixel_row_offset = flr((SCREEN_SIZE() - map_size.height) / 2)
-    local pixel_col_offset = flr((SCREEN_SIZE() - map_size.width) / 2)
-    next_map.pos = { x = pixel_row_offset, y = pixel_col_offset }
+    -- generate the isomap. initialize all at the start to empty
+    next_map.isocells = {}
+    local row_cnt = isomap_row_cnt(next_map)
+    local idx = 1
+    for row = 1,row_cnt do
+        local midpoint_row = next_map.iso_width
 
-    -- generate the map
-    next_map.cells = {}
-    for row=1,next_map.height_in_tiles do
-        add(next_map.cells, {})
-        for col=1,next_map.width_in_tiles do
-            add(next_map.cells[row], generate_rnd_tile())
+        local row_offset = (row - next_map.iso_width) * ISO_TILE_HEIGHT() / 2
+        local col_cnt = nil
+        if row <= midpoint_row then
+            col_cnt = row
+        else
+            col_cnt = 2 * midpoint_row - row
+        end
+
+        for col = 1,col_cnt do
+            local col_offset =
+                -1 * ((col_cnt/2) * ISO_TILE_WIDTH()) -- shift half the board width to the left
+                + (ISO_TILE_WIDTH()/2)                -- offset by half a tile width to move back into the center of the first tile
+                + ((col - 1)*ISO_TILE_WIDTH())        -- add a tile width for each subsequent tile
+            local cell = {
+                idx = idx,
+                tile = make_tile(false, TileType.Empty),
+                pos = {
+                    x = SCREEN_SIZE()/2 + col_offset,
+                    y = SCREEN_SIZE()/2 + row_offset,
+                },
+                collider = {
+                    radius = 4
+                }
+            }
+
+            add(next_map.isocells, cell)
+            idx += 1
         end
     end
 
-    -- generate the player start position
-    next_map.player_start_tile = select_random_empty_map_position(next_map)
-    next_map.cells[next_map.player_start_tile.y][next_map.player_start_tile.x] = make_tile(true, TileType.Start)
+    -- generate the iso trap cells. Generate 30% of the map as trap cells
+    local trap_cell_cnt = flr(next_map.iso_width * next_map.iso_width * 0.30)
+    for i = 1,trap_cell_cnt do
+        local next_trap_cell_idx = select_random_empty_isomap_tile_idx(next_map)
+        next_map.isocells[next_trap_cell_idx].tile = make_tile(false, TileType.Trap)
+    end
 
-    -- place the finish
-    local finish_point = select_random_empty_map_position(next_map)
-    next_map.cells[finish_point.y][finish_point.x] = make_tile(false, TileType.Finish)
+    -- generate the player start position on an isotile
+    next_map.player_start_iso_idx = select_random_empty_isomap_tile_idx(next_map)
+    next_map.isocells[next_map.player_start_iso_idx].tile = make_tile(true, TileType.Start)
+
+    -- place the iso finish
+    local iso_finish_cell_idx = select_random_empty_isomap_tile_idx(next_map)
+    next_map.isocells[iso_finish_cell_idx].tile = make_tile(false, TileType.Finish)
 
     g_maps[next_level] = next_map
     g_map = next_map
-end
-
-function generate_rnd_tile()
-    -- TODO: better tile generation (or maybe using predefined maps?)
-    if rnd() < 0.3 then
-        return make_tile(false, TileType.Trap)
-    else
-        return make_tile(false, TileType.Empty)
-    end
-
 end
 
 function make_tile(visible, tile_type)
     return { visible = visible, type = tile_type }
 end
 
-function select_random_empty_map_position(map)
+function select_random_empty_isomap_tile_idx(map)
+    local idx = 1
     local choice_cnt = 0
     local choices = {}
-    for y=1,map.height_in_tiles do
-        for x=1,map.width_in_tiles do
-            local tile = map.cells[y][x]
-            if tile.type == TileType.Empty then
-                add(choices, { x = x, y = y })
-                choice_cnt += 1
-            end
+    for cell in all(map.isocells) do
+        if cell.tile.type == TileType.Empty then
+            add(choices, idx)
+            choice_cnt += 1
         end
+        idx += 1
     end
 
     local rnd_choice_index = rnd_incrange(1, choice_cnt)
     return choices[rnd_choice_index]
 end
 
-function get_tile_color(tile)
-    if tile.visible then
+function get_iso_tile_sprite_frame(tile)
+    local visible = tile.visible
+    -- TODO: uncomment to force visibility
+    -- visible = true
+    if visible then
         if tile.type == TileType.Empty then
-            return Colors.Tan
+            return 100
         elseif tile.type == TileType.Start then
-            return Colors.Tan
+            return 108
         elseif tile.type == TileType.Finish then
-            return Colors.LightGreen
+            return 104
         elseif tile.type == TileType.Trap then
-            return Colors.Red
+            return 72
         else
             return nil
         end
     else
-        return Colors.Brown
+        return 96
     end
 end
 
 function move_player(input)
+    -- when traveling diagnonally, multiply by the factor sqrt(0.5) to avoid traveling further by going diagonally
     local sqrt_half = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
     local movement = nil
     if g_input.btn_left then
         if g_input.btn_up then
-            movement = { x = -1 * sqrt_half, y = -1 * sqrt_half }
+            movement = { x = -2 * sqrt_half, y = -1 * sqrt_half }
         elseif g_input.btn_down then
-            movement = { x = -1 * sqrt_half, y = sqrt_half }
+            movement = { x = -2 * sqrt_half, y = sqrt_half }
         else
-            movement = { x = -1, y = 0 }
+            movement = { x = -2, y = 0 }
         end
     elseif g_input.btn_right then
         if g_input.btn_up then
-            movement = { x = sqrt_half, y = -1 * sqrt_half }
+            movement = { x = 2 * sqrt_half, y = -1 * sqrt_half }
         elseif g_input.btn_down then
-            movement = { x = sqrt_half, y = sqrt_half }
+            movement = { x = 2 * sqrt_half, y = sqrt_half }
         else
-            movement = { x = 1, y = 0 }
+            movement = { x = 2, y = 0 }
         end
     elseif g_input.btn_up then
         movement = { x = 0, y = -1 }
@@ -292,13 +319,17 @@ function move_player(input)
         return
     end
 
-    local player_speed = 1.3
+    local player_speed = 0.7 -- an arbitrary, tweakable speed factor to hand tune movement speed to feel good
     movement.x *= player_speed
     movement.y *= player_speed
 
-    local map_size = calc_map_size(g_map)
-    g_player.collider.pos.x = clamp(g_map.pos.x, g_player.collider.pos.x + movement.x, g_map.pos.x + map_size.width - g_player.collider.width)
-    g_player.collider.pos.y = clamp(g_map.pos.y, g_player.collider.pos.y + movement.y, g_map.pos.y + map_size.height - g_player.collider.height)
+    -- FIXME: fix the movement bounding
+
+    -- local map_size = calc_map_size(g_map)
+    -- g_player.collider.pos.x = clamp(g_map.pos.x + g_player.collider.radius/2, g_player.collider.pos.x + movement.x, g_map.pos.x + map_size.width - g_player.collider.radius / 2)
+    -- g_player.collider.pos.y = clamp(g_map.pos.y + g_player.collider.radius/2, g_player.collider.pos.y + movement.y, g_map.pos.y + map_size.height - g_player.collider.radius / 2)
+    g_player.collider.pos.x = clamp(g_player.collider.radius/2, g_player.collider.pos.x + movement.x, 128 - g_player.collider.radius / 2)
+    g_player.collider.pos.y = clamp(g_player.collider.radius/2, g_player.collider.pos.y + movement.y, 128 - g_player.collider.radius / 2)
 end
 
 function animate_player(input)
@@ -348,15 +379,6 @@ function animate_player(input)
     update_anim(g_player, anim)
 end
 
-function get_pos_to_center_on_tile(map, tile_pos, obj_width, obj_height)
-    local tile_worldpos_x = (tile_pos.x - 1) * TILE_SIZE() + map.pos.x
-    local tile_worldpos_y = (tile_pos.y - 1) * TILE_SIZE() + map.pos.y
-    return {
-        x = ((TILE_SIZE() - obj_width)  / 2 ) + tile_worldpos_x,
-        y = ((TILE_SIZE() - obj_height)  / 2 ) + tile_worldpos_y,
-    }
-end
-
 function copy_pos(pos)
     return { x = pos.x, y = pos.y }
 end
@@ -368,57 +390,37 @@ function sprite_pos_from_collider(collider)
     }
 end
 
-function calc_map_size(map)
-    return { width = map.width_in_tiles * TILE_SIZE(), height = map.height_in_tiles * TILE_SIZE() }
+function get_player_iso_tile_idx(map, player)
+    function sqr(x) return x * x end
+
+    for cell in all(map.isocells) do
+        -- TODO: once collider on player is fixed refactor into a shared circ_colliders_overlap helper
+        local max_dist_squared = sqr(player.collider.radius +  cell.collider.radius)
+        local dist_squared = sqr(player.collider.pos.x - cell.pos.x) + sqr(player.collider.pos.y - cell.pos.y)
+        if dist_squared <= max_dist_squared then
+            return cell.idx
+        end
+    end
+    return nil
 end
 
-function get_player_tile_idx(map, player)
-    local tile_x = flr((player.collider.pos.x - map.pos.x) / TILE_SIZE())
-    local tile_y = flr((player.collider.pos.y - map.pos.y) / TILE_SIZE())
-
-    -- check for off-map
-    if (tile_x < 0) or (tile_y < 0) or (tile_x >= map.width_in_tiles) or (tile_y >= map.height_in_tiles) then
-        return
-    end
-
-    local tile_collider = {
-        pos = {
-            x = tile_x * TILE_SIZE() + map.pos.x,
-            y = tile_y * TILE_SIZE() + map.pos.y,
-        },
-        -- make the tile collider not the entire size of the tile that way players don't immediately trip a tile as
-        -- soon as they hit the border of one
-        width = 10,
-        height = 12,
+function highlight_player_iso_tile(map, player_tile_idx)
+    local tile_pos = map.isocells[player_tile_idx].pos
+    -- N.B. for some reason, I need to subtract '1' from each of the y values. I haven't yet rationalized why
+    -- the off-by-one pixel shift is needed. I'll figure it out later.
+    local line_points = {
+        { x = tile_pos.x - ISO_TILE_WIDTH()/2, y = tile_pos.y - 1 },
+        { x = tile_pos.x,                      y = tile_pos.y - 1 - ISO_TILE_HEIGHT()/2 },
+        { x = tile_pos.x + ISO_TILE_WIDTH()/2, y = tile_pos.y - 1},
+        { x = tile_pos.x,                      y = tile_pos.y - 1+ ISO_TILE_HEIGHT()/2 },
     }
 
-    if rect_colliders_overlap(player.collider, tile_collider) then
-        return { x = (tile_x + 1), y = (tile_y + 1) }
-    else
-        return nil
-    end
+    line(line_points[1].x, line_points[1].y, line_points[2].x, line_points[2].y, Colors.White)
+    line(line_points[2].x, line_points[2].y, line_points[3].x, line_points[3].y, Colors.White)
+    line(line_points[3].x, line_points[3].y, line_points[4].x, line_points[4].y, Colors.White)
+    line(line_points[4].x, line_points[4].y, line_points[1].x, line_points[1].y, Colors.White)
 end
 
-function rect_colliders_overlap(c1, c2)
-    local c2_left_of_c1 = c1.pos.x >= (c2.pos.x + c2.width)
-    local c1_left_of_c1 = c2.pos.x >= (c1.pos.x + c1.width)
-    if c2_left_of_c1 or c1_left_of_c1 then
-        return false
-    end
-
-    local c2_below_c1 = c1.pos.y >= (c2.pos.y + c2.height)
-    local c1_below_c1 = c2.pos.y >= (c1.pos.y + c1.height)
-    if c2_below_c1 or c1_below_c1 then
-        return false
-    end
-
-    return true
-end
-
-function highlight_player_tile(map, player_tile_idx)
-    local player_tile_x0 = (player_tile_idx.x-1) * TILE_SIZE() + map.pos.x
-    local player_tile_x1 = player_tile_x0 + TILE_SIZE() - 1
-    local player_tile_y0 = (player_tile_idx.y-1) * TILE_SIZE() + map.pos.y
-    local player_tile_y1 = player_tile_y0 + TILE_SIZE() - 1
-    rect(player_tile_x0, player_tile_y0, player_tile_x1, player_tile_y1, Colors.White)
+function isomap_row_cnt(map)
+    return map.iso_width * 2 - 1
 end
