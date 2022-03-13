@@ -118,6 +118,12 @@ function _draw()
     for isocell in all(g_map.isocells) do
         local frame_idx = get_iso_tile_sprite_frame(isocell.tile)
         if frame_idx != nil then
+            -- DRAW A TOWER BORDER
+            -- rectfill(isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y, isocell.pos.x, 128, Colors.Maroon)
+            -- rectfill(isocell.pos.x, isocell.pos.y, isocell.pos.x + ISO_TILE_WIDTH()/2, 128, Colors.BlueGray)
+
+            -- DRAW A THIN BORDER
+            spr(128, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y, 4, 2, false)
             spr(frame_idx, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
         end
     end
