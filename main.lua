@@ -1,5 +1,4 @@
 -- main.lua - main game logic
--- TODO: if possible remove 'iso' from all unnecessary names before checkin and remove all non-iso equivalents
 -- TODO: add the border to the lower iso cells
 
 TileType = {
@@ -7,6 +6,7 @@ TileType = {
     Start = 2,
     Finish = 3,
     Trap = 4,
+    Fall = 5,
 }
 
 -- constants
@@ -34,12 +34,9 @@ g_anims = nil
 
 function _init()
     g_player = {}
-    g_player.collider = {
-        -- FIXME: separate out the player's collider from their base position
-        pos = { x = 0, y = 0 },
-        sprite_offset = { x = -8, y = -14 },
-        radius = 3,
-    }
+    g_player.pos = { x = 0, y = 0 }
+    g_player.sprite_offset = { x = -8, y = -14 }
+    g_player.collider = { radius = 3 }
 
     g_anims = {
         IdleDown = create_anim_flow(34, 1, 10, 2, false),
@@ -120,7 +117,9 @@ function _draw()
     -- draw iso map
     for isocell in all(g_map.isocells) do
         local frame_idx = get_iso_tile_sprite_frame(isocell.tile)
-        spr(frame_idx, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
+        if frame_idx != nil then
+            spr(frame_idx, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
+        end
     end
 
     local player_iso_tile_idx = get_player_iso_tile_idx(g_map, g_player)
@@ -131,11 +130,9 @@ function _draw()
     --
     -- draw the player
     --
-    local player_sprite_pos = sprite_pos_from_collider(g_player.collider)
+    local player_sprite_pos = sprite_pos(g_player)
     draw_anim(g_player, player_sprite_pos)
 
-    -- DEBUG bring player pos
-    --print("pos: ("..g_player.collider.pos.x..","..g_player.collider.pos.y..")", 60, 120, Colors.White)
     --
     -- draw the level UI
     --
@@ -152,24 +149,24 @@ function _draw()
     g_ingame_timer.draw()
 
     -- uncomment to draw colliders on top of everything
-    --circ(g_player.collider.pos.x, g_player.collider.pos.y, g_player.collider.radius, Colors.White)
+    --circ(g_player.pos.x, g_player.pos.y, g_player.collider.radius, Colors.White)
     --for cell in all(g_map.isocells) do
     --    circ(cell.pos.x, cell.pos.y, cell.collider.radius, Colors.White)
     --end
 
     -- uncomment to dump frame stats
-    print("mem:  "..stat(0), 80, 80, Colors.White)
-    print("cpu:  "..stat(1), 80, 90, Colors.White)
-    print("fps(t): "..stat(8), 80, 100, Colors.White)
-    print("fps(a): "..stat(7), 80, 110, Colors.White)
+    -- print("mem:  "..stat(0), 80, 80, Colors.White)
+    -- print("cpu:  "..stat(1), 80, 90, Colors.White)
+    -- print("fps(t): "..stat(8), 80, 100, Colors.White)
+    -- print("fps(a): "..stat(7), 80, 110, Colors.White)
 end
 
 function move_to_level(next_level)
     -- update the current map
     change_level(next_level)
 
-    -- center the player's collider on the center of the iso tile
-    g_player.collider.pos = copy_pos(g_map.isocells[g_map.player_start_iso_idx].pos)
+    -- place the player on the center of the iso tile
+    g_player.pos = copy_pos(g_map.isocells[g_map.player_start_iso_idx].pos)
 
     -- reset the player's animation
     update_anim(g_player, g_anims.IdleDown)
@@ -196,12 +193,13 @@ function change_level(next_level)
 
     -- generate the isomap. initialize all at the start to empty
     next_map.isocells = {}
-    local row_cnt = isomap_row_cnt(next_map)
+    -- add an two extra rows to each side of the map so we can wrap the map with fall tiles
+    local row_cnt = isomap_row_cnt(next_map) + 4
     local idx = 1
     for row = 1,row_cnt do
-        local midpoint_row = next_map.iso_width
+        local midpoint_row = flr((row_cnt + 1) / 2)
 
-        local row_offset = (row - next_map.iso_width) * ISO_TILE_HEIGHT() / 2
+        local row_offset = (row - midpoint_row) * ISO_TILE_HEIGHT() / 2
         local col_cnt = nil
         if row <= midpoint_row then
             col_cnt = row
@@ -210,20 +208,28 @@ function change_level(next_level)
         end
 
         for col = 1,col_cnt do
+            local tile = nil
+
+            local is_edge_tile = (col == 1) or (col == col_cnt)
+            if is_edge_tile then
+                tile = make_tile(true, TileType.Fall)
+            else
+                tile = make_tile(false, TileType.Empty)
+            end
+
             local col_offset =
                 -1 * ((col_cnt/2) * ISO_TILE_WIDTH()) -- shift half the board width to the left
                 + (ISO_TILE_WIDTH()/2)                -- offset by half a tile width to move back into the center of the first tile
                 + ((col - 1)*ISO_TILE_WIDTH())        -- add a tile width for each subsequent tile
+
             local cell = {
                 idx = idx,
-                tile = make_tile(false, TileType.Empty),
+                tile = tile,
                 pos = {
                     x = SCREEN_SIZE()/2 + col_offset,
                     y = SCREEN_SIZE()/2 + row_offset,
                 },
-                collider = {
-                    radius = 4
-                }
+                collider = { radius = 4 }
             }
 
             add(next_map.isocells, cell)
@@ -271,10 +277,7 @@ function select_random_empty_isomap_tile_idx(map)
 end
 
 function get_iso_tile_sprite_frame(tile)
-    local visible = tile.visible
-    -- TODO: uncomment to force visibility
-    -- visible = true
-    if visible then
+    if tile.visible then
         if tile.type == TileType.Empty then
             return 100
         elseif tile.type == TileType.Start then
@@ -283,6 +286,8 @@ function get_iso_tile_sprite_frame(tile)
             return 104
         elseif tile.type == TileType.Trap then
             return 72
+        elseif tile.type == TileType.Fall then
+            return nil
         else
             return nil
         end
@@ -294,42 +299,77 @@ end
 function move_player(input)
     -- when traveling diagnonally, multiply by the factor sqrt(0.5) to avoid traveling further by going diagonally
     local sqrt_half = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
-    local movement = nil
+    local movement_x = 0
+    local movement_y = 0
     if g_input.btn_left then
         if g_input.btn_up then
-            movement = { x = -2 * sqrt_half, y = -1 * sqrt_half }
+            movement_x = -2 * sqrt_half
+            movement_y = -1 * sqrt_half
         elseif g_input.btn_down then
-            movement = { x = -2 * sqrt_half, y = sqrt_half }
+            movement_x = -2 * sqrt_half
+            movement_y = sqrt_half
         else
-            movement = { x = -2, y = 0 }
+            movement_x = -2
+            movement_y = 0
         end
     elseif g_input.btn_right then
         if g_input.btn_up then
-            movement = { x = 2 * sqrt_half, y = -1 * sqrt_half }
+            movement_x = 2 * sqrt_half
+            movement_y = -1 * sqrt_half
         elseif g_input.btn_down then
-            movement = { x = 2 * sqrt_half, y = sqrt_half }
+            movement_x = 2 * sqrt_half
+            movement_y = sqrt_half
         else
-            movement = { x = 2, y = 0 }
+            movement_x = 2
+            movement_y = 0
         end
     elseif g_input.btn_up then
-        movement = { x = 0, y = -1 }
+            movement_x = 0
+            movement_y = -1
     elseif g_input.btn_down then
-        movement = { x = 0, y = 1 }
+            movement_x = 0
+            movement_y = 1
     else
         return
     end
 
     local player_speed = 0.7 -- an arbitrary, tweakable speed factor to hand tune movement speed to feel good
-    movement.x *= player_speed
-    movement.y *= player_speed
+    movement_x *= player_speed
+    movement_y *= player_speed
 
-    -- FIXME: fix the movement bounding
+    -- copy the old position in case we need to roll back
+    local old_player_pos = copy_pos(g_player.pos)
 
-    -- local map_size = calc_map_size(g_map)
-    -- g_player.collider.pos.x = clamp(g_map.pos.x + g_player.collider.radius/2, g_player.collider.pos.x + movement.x, g_map.pos.x + map_size.width - g_player.collider.radius / 2)
-    -- g_player.collider.pos.y = clamp(g_map.pos.y + g_player.collider.radius/2, g_player.collider.pos.y + movement.y, g_map.pos.y + map_size.height - g_player.collider.radius / 2)
-    g_player.collider.pos.x = clamp(g_player.collider.radius/2, g_player.collider.pos.x + movement.x, 128 - g_player.collider.radius / 2)
-    g_player.collider.pos.y = clamp(g_player.collider.radius/2, g_player.collider.pos.y + movement.y, 128 - g_player.collider.radius / 2)
+    -- move the player, check if they've moved onto a fall tile
+    local pos_candidates = {}
+    add(pos_candidates, add_pos(old_player_pos, { x = movement_x, y = movement_y }))
+    if movement_x != 0 then
+        add(pos_candidates, add_pos(old_player_pos, { x = movement_x, y = 0 }))
+    end
+    if movement_y != 0 then
+        add(pos_candidates, add_pos(old_player_pos, { x = 0, y = movement_y }))
+    end
+
+    for pos in all(pos_candidates) do
+        g_player.pos = pos
+
+        -- check if we've standing on any fall tiles and if so, rollback the movement
+        local cells = get_iso_cells_under_player(g_map, g_player)
+        local valid_move = true
+        for cell in all(cells) do
+            if cell.tile.type == TileType.Fall then
+                valid_move = false
+                break
+            end
+        end
+
+        if valid_move then
+            return
+        end
+    end
+
+    -- rollback
+    g_player.pos = old_player_pos
 end
 
 function animate_player(input)
@@ -383,25 +423,87 @@ function copy_pos(pos)
     return { x = pos.x, y = pos.y }
 end
 
-function sprite_pos_from_collider(collider)
+function sprite_pos(obj)
     return {
-        x = collider.pos.x + collider.sprite_offset.x,
-        y = collider.pos.y + collider.sprite_offset.y,
+        x = obj.pos.x + obj.sprite_offset.x,
+        y = obj.pos.y + obj.sprite_offset.y,
     }
 end
 
 function get_player_iso_tile_idx(map, player)
-    function sqr(x) return x * x end
-
-    for cell in all(map.isocells) do
-        -- TODO: once collider on player is fixed refactor into a shared circ_colliders_overlap helper
-        local max_dist_squared = sqr(player.collider.radius +  cell.collider.radius)
-        local dist_squared = sqr(player.collider.pos.x - cell.pos.x) + sqr(player.collider.pos.y - cell.pos.y)
-        if dist_squared <= max_dist_squared then
+    -- N.B. Currently we do an extra smaller circle collider check so that we only activate at most one tile at a time
+    -- even if we are standing in between two..
+    for cell in all(get_iso_cells_under_player(map, player)) do
+        if circ_colliders_overlap(player, cell) then
             return cell.idx
         end
     end
+
     return nil
+end
+
+function circ_colliders_overlap(obj1, obj2)
+    function sqr(x) return x * x end
+    local max_dist_squared = sqr(obj1.collider.radius +  obj2.collider.radius)
+    local dist_squared = sqr(obj1.pos.x - obj2.pos.x) + sqr(obj1.pos.y - obj2.pos.y)
+    return dist_squared <= max_dist_squared
+end
+
+function get_iso_cells_under_player(map, player)
+    cells = {}
+    for cell in all(map.isocells) do
+        if is_iso_cell_under_player(cell, player) then
+            add(cells, cell)
+        end
+    end
+
+    return cells
+end
+
+function is_iso_cell_under_player(cell, player)
+    -- divide up an iso-tile into 3 rect colliders
+    local iso_sub_colliders = {
+        { width = 12, height = 12 },
+        { width = 18, height = 9 },
+        { width = 26, height = 5 },
+    }
+
+    -- setup a simple rect-collider for the player wrapping their circle collider
+    local player_rect_collider = {
+        pos = {
+            x = player.pos.x - player.collider.radius,
+            y = player.pos.y - player.collider.radius,
+        },
+        width = (player.collider.radius + player.collider.radius),
+        height = (player.collider.radius + player.collider.radius),
+    }
+
+    local cell_pos_x = cell.pos.x
+    local cell_pos_y = cell.pos.y
+    for sub_collider in all(iso_sub_colliders) do
+        -- center the subcollider in the iso cell
+        sub_collider.pos = { x = cell_pos_x - (sub_collider.width/2), y = cell_pos_y - (sub_collider.height/2) }
+        if rect_colliders_overlap(player_rect_collider, sub_collider) then
+            return true
+        end
+    end
+    return false
+end
+
+function rect_colliders_overlap(c1, c2)
+    local c2_left_of_c1 = c1.pos.x >= (c2.pos.x + c2.width)
+    local c1_left_of_c1 = c2.pos.x >= (c1.pos.x + c1.width)
+    if c2_left_of_c1 or c1_left_of_c1 then
+        return false
+    end
+
+    local c2_below_c1 = c1.pos.y >= (c2.pos.y + c2.height)
+    local c1_below_c1 = c2.pos.y >= (c1.pos.y + c1.height)
+    if c2_below_c1 or c1_below_c1 then
+        return false
+    end
+
+    return true
 end
 
 function highlight_player_iso_tile(map, player_tile_idx)
@@ -423,4 +525,8 @@ end
 
 function isomap_row_cnt(map)
     return map.iso_width * 2 - 1
+end
+
+function add_pos(p1, p2)
+    return { x = p1.x + p2.x, y = p1.y + p2.y }
 end
