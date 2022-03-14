@@ -8,6 +8,17 @@ TileType = {
     Fall = 5,
 }
 
+HintArrow = {
+    Up = 1,
+    UpRight = 2,
+    Right = 3,
+    DownRight = 4,
+    Down = 5,
+    DownLeft = 6,
+    Left = 7,
+    UpLeft = 8,
+}
+
 -- constants
 function ISO_TILE_WIDTH()
     return 32
@@ -126,9 +137,7 @@ function camera_follow_player(player, camera_ofs)
     end
 
     -- If the camera is outside of the max allowed distance, move it closer
-    local dir_vector = {
-        x = camera_ofs.x - player_camera_center_ofs.x,
-        y = camera_ofs.y - player_camera_center_ofs.y }
+    local dir_vector = sub_vec2(camera_ofs, player_camera_center_ofs)
 
     -- take the distance and divide it out to get the unit vector
     local dist = sqrt(dist_squared)
@@ -139,7 +148,7 @@ function camera_follow_player(player, camera_ofs)
     dir_vector.x *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
     dir_vector.y *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
 
-    new_ofs = add_pos(player.pos, dir_vector)
+    new_ofs = add_vec2(player.pos, dir_vector)
     camera_ofs.x = new_ofs.x - 64
     camera_ofs.y = new_ofs.y - 64
 end
@@ -159,13 +168,14 @@ function _draw()
     for isocell in all(g_map.isocells) do
         local frame_idx = get_iso_tile_sprite_frame(isocell.tile)
         if frame_idx != nil then
-            -- DRAW A TOWER BORDER
-            -- rectfill(isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y, isocell.pos.x, 128, Colors.Maroon)
-            -- rectfill(isocell.pos.x, isocell.pos.y, isocell.pos.x + ISO_TILE_WIDTH()/2, 128, Colors.BlueGray)
-
             -- DRAW A THIN BORDER
             spr(128, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y, 4, 2, false)
             spr(frame_idx, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
+
+            -- draw the hint arrow if the empty hint cell is visible
+            if isocell.tile.type == TileType.Empty and isocell.tile.visible then
+                draw_hint_arrow(isocell.pos, isocell.tile.hint)
+            end
         end
     end
 
@@ -210,6 +220,53 @@ function _draw()
     -- print("cpu:  "..stat(1), 80, 90, Colors.White)
     -- print("fps(t): "..stat(8), 80, 100, Colors.White)
     -- print("fps(a): "..stat(7), 80, 110, Colors.White)
+end
+
+function draw_hint_arrow(pos_center, hint)
+    local arrow_tile_px_size = 8
+    local pos = {
+        x = pos_center.x - (arrow_tile_px_size/2),
+        y = pos_center.y - (arrow_tile_px_size/2) }
+
+    local frame = nil
+    local flip_x = nil
+    local flip_y = nil
+
+    if     hint == HintArrow.Right then
+        frame = 134
+        flip_x = false
+        flip_y = false
+    elseif hint == HintArrow.DownRight then
+        frame = 133
+        flip_x = false
+        flip_y = true
+    elseif hint == HintArrow.Down then
+        frame = 132
+        flip_x = false
+        flip_y = true
+    elseif hint == HintArrow.DownLeft then
+        frame = 133
+        flip_x = true
+        flip_y = true
+    elseif hint == HintArrow.Left then
+        frame = 134
+        flip_x = true
+        flip_y = false
+    elseif hint == HintArrow.UpLeft then
+        frame = 133
+        flip_x = true
+        flip_y = false
+    elseif hint == HintArrow.Up then
+        frame = 132
+        flip_x = false
+        flip_y = false
+    else -- hint == HintArrow.UpRight
+        frame = 133
+        flip_x = false
+        flip_y = false
+    end
+
+    spr(frame, pos.x, pos.y, 1, 1, flip_x, flip_y)
 end
 
 function move_to_level(next_level)
@@ -305,6 +362,39 @@ function change_level(next_level)
     local iso_finish_cell_idx = select_random_empty_isomap_tile_idx(next_map)
     next_map.isocells[iso_finish_cell_idx].tile = make_tile(false, TileType.Finish)
 
+    -- now that we've placed the finish cell, update all the empty cells with hints
+    local iso_finish_cell_pos = next_map.isocells[iso_finish_cell_idx].pos
+    for cell in all(next_map.isocells) do
+        if cell.tile.type == TileType.Empty then
+            local dir_vector = sub_vec2(iso_finish_cell_pos, cell.pos)
+            local unit_circle_ratio = atan2(dir_vector.x, -1 * dir_vector.y)
+            local angle_to_finish_point_deg = unit_circle_ratio * 360
+
+            local hint_arrow = nil
+            if     angle_to_finish_point_deg <  22.5 then
+                hint_arrow = HintArrow.Right
+            elseif angle_to_finish_point_deg <  67.5 then
+                hint_arrow = HintArrow.DownRight
+            elseif angle_to_finish_point_deg < 112.5 then
+                hint_arrow = HintArrow.Down
+            elseif angle_to_finish_point_deg < 157.5 then
+                hint_arrow = HintArrow.DownLeft
+            elseif angle_to_finish_point_deg < 202.5 then
+                hint_arrow = HintArrow.Left
+            elseif angle_to_finish_point_deg < 247.5 then
+                hint_arrow = HintArrow.UpLeft
+            elseif angle_to_finish_point_deg < 292.5 then
+                hint_arrow = HintArrow.Up
+            elseif angle_to_finish_point_deg < 337.5 then
+                hint_arrow = HintArrow.UpRight
+            else
+                hint_arrow = HintArrow.Right
+            end
+
+            cell.tile.hint = hint_arrow
+        end
+    end
+
     g_maps[next_level] = next_map
     g_map = next_map
 end
@@ -332,13 +422,13 @@ end
 function get_iso_tile_sprite_frame(tile)
     if tile.visible then
         if tile.type == TileType.Empty then
-            return 100
+            return 160
         elseif tile.type == TileType.Start then
             return 108
         elseif tile.type == TileType.Finish then
             return 104
         elseif tile.type == TileType.Trap then
-            return 72
+            return 76
         elseif tile.type == TileType.Fall then
             return nil
         else
@@ -404,7 +494,7 @@ function move_player(input)
     end
 
     for move in all(move_candidates) do
-        g_player.pos = add_pos(old_player_pos, move)
+        g_player.pos = add_vec2(old_player_pos, move)
 
         -- check if we've standing on any fall tiles and if so, rollback the movement
         local cells = get_iso_cells_under_player(g_map, g_player)
@@ -579,6 +669,10 @@ function isomap_row_cnt(map)
     return map.iso_width * 2 - 1
 end
 
-function add_pos(p1, p2)
+function add_vec2(p1, p2)
     return { x = p1.x + p2.x, y = p1.y + p2.y }
+end
+
+function sub_vec2(p1, p2)
+    return { x = p1.x - p2.x, y = p1.y - p2.y }
 end
