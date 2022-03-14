@@ -1,5 +1,4 @@
 -- main.lua - main game logic
--- TODO: add the border to the lower iso cells
 
 TileType = {
     Empty = 1,
@@ -126,8 +125,7 @@ function camera_follow_player(player, camera_ofs)
         return
     end
 
-    -- TODO: there may be a smarter way to do this. Calculate the direction vector from the player to the current camera_ofs
-    -- then set the new camera_ofs to that direction vector exactly max_distance away
+    -- If the camera is outside of the max allowed distance, move it closer
     local dir_vector = {
         x = camera_ofs.x - player_camera_center_ofs.x,
         y = camera_ofs.y - player_camera_center_ofs.y }
