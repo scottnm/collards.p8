@@ -19,7 +19,11 @@ function ISO_TILE_HEIGHT()
 end
 
 function MAX_TILE_LINE()
-    return 4
+    return 8
+end
+
+function MAX_CAMERA_DISTANCE_FROM_PLAYER()
+    return 20
 end
 
 -- global variables
@@ -31,9 +35,11 @@ g_player_found_exit_timer = nil
 g_player_respawn_timer = nil
 g_ingame_timer = nil
 g_anims = nil
+g_camera_player_offset = nil
 
 function _init()
     g_player = {}
+    g_camera_player_offset = { x = 0, y = 0 }
     g_player.pos = { x = 0, y = 0 }
     g_player.sprite_offset = { x = -8, y = -14 }
     g_player.collider = { radius = 3 }
@@ -107,8 +113,45 @@ function _update()
     end
 end
 
+function get_centered_camera_on_player(player)
+    return  { x = player.pos.x - 64, y = player.pos.y - 64 }
+end
+
+function camera_follow_player(player, camera_ofs)
+    -- If the camera is already within the max allowed distance from the player
+    -- don't move the camera
+    local player_camera_center_ofs = get_centered_camera_on_player(player)
+    local dist_squared = sqr_dist(player_camera_center_ofs, camera_ofs)
+    if dist_squared <= sqr(MAX_CAMERA_DISTANCE_FROM_PLAYER()) then
+        return
+    end
+
+    -- TODO: there may be a smarter way to do this. Calculate the direction vector from the player to the current camera_ofs
+    -- then set the new camera_ofs to that direction vector exactly max_distance away
+    local dir_vector = {
+        x = camera_ofs.x - player_camera_center_ofs.x,
+        y = camera_ofs.y - player_camera_center_ofs.y }
+
+    -- take the distance and divide it out to get the unit vector
+    local dist = sqrt(dist_squared)
+    dir_vector.x /= dist
+    dir_vector.y /= dist
+
+    -- multiply the max distance to get our max distance from player
+    dir_vector.x *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
+    dir_vector.y *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
+
+    new_ofs = add_pos(player.pos, dir_vector)
+    camera_ofs.x = new_ofs.x - 64
+    camera_ofs.y = new_ofs.y - 64
+end
+
 function _draw()
     cls(Colors.BLACK)
+
+    -- Set the camera view so that the world is draw relative to its position
+    camera_follow_player(g_player, g_camera_player_offset)
+    camera(g_camera_player_offset.x, g_camera_player_offset.y);
 
     --
     -- draw the tiles
@@ -139,9 +182,15 @@ function _draw()
     local player_sprite_pos = sprite_pos(g_player)
     draw_anim(g_player, player_sprite_pos)
 
+
     --
+    -- Draw all fixed UI
+    --
+
+    -- reset the camera to 0 keep the UI fixed on screen
+    camera(0, 0)
+
     -- draw the level UI
-    --
     print("Level: "..g_map.level_id, 0, 120, Colors.White)
     if g_player_found_exit_timer != nil then
         print("FOUND EXIT", 100, 120, Colors.White)
@@ -149,9 +198,7 @@ function _draw()
         print("DIED", 100, 120, Colors.White)
     end
 
-    --
     -- draw the in-game timer UI
-    --
     g_ingame_timer.draw()
 
     -- uncomment to draw colliders on top of everything
@@ -173,6 +220,8 @@ function move_to_level(next_level)
 
     -- place the player on the center of the iso tile
     g_player.pos = copy_pos(g_map.isocells[g_map.player_start_iso_idx].pos)
+    -- place the camera on top of the player
+    g_camera_player_offset = get_centered_camera_on_player(g_player)
 
     -- reset the player's animation
     update_anim(g_player, g_anims.IdleDown)
@@ -347,17 +396,17 @@ function move_player(input)
     local old_player_pos = copy_pos(g_player.pos)
 
     -- move the player, check if they've moved onto a fall tile
-    local pos_candidates = {}
-    add(pos_candidates, add_pos(old_player_pos, { x = movement_x, y = movement_y }))
+    local move_candidates = {}
+    add(move_candidates, { x = movement_x, y = movement_y })
     if movement_x != 0 then
-        add(pos_candidates, add_pos(old_player_pos, { x = movement_x, y = 0 }))
+        add(move_candidates, { x = movement_x, y = 0 })
     end
     if movement_y != 0 then
-        add(pos_candidates, add_pos(old_player_pos, { x = 0, y = movement_y }))
+        add(move_candidates, { x = 0, y = movement_y })
     end
 
-    for pos in all(pos_candidates) do
-        g_player.pos = pos
+    for move in all(move_candidates) do
+        g_player.pos = add_pos(old_player_pos, move)
 
         -- check if we've standing on any fall tiles and if so, rollback the movement
         local cells = get_iso_cells_under_player(g_map, g_player)
@@ -449,9 +498,8 @@ function get_player_iso_tile_idx(map, player)
 end
 
 function circ_colliders_overlap(obj1, obj2)
-    function sqr(x) return x * x end
     local max_dist_squared = sqr(obj1.collider.radius +  obj2.collider.radius)
-    local dist_squared = sqr(obj1.pos.x - obj2.pos.x) + sqr(obj1.pos.y - obj2.pos.y)
+    local dist_squared = sqr_dist(obj1.pos, obj2.pos)
     return dist_squared <= max_dist_squared
 end
 

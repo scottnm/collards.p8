@@ -101,3 +101,10 @@ function format_int_base10 (n, max_leading_zeroes)
     return str
 end
 
+function sqr(x)
+    return x * x
+end
+
+function sqr_dist(a, b)
+    return sqr(a.x - b.x) + sqr(a.y - b.y)
+end
