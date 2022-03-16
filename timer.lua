@@ -21,11 +21,13 @@ function make_ingame_timer(num_frames)
     }
 end
 
-function make_ui_timer()
+function make_ui_timer(on_flash)
     local self = {
         timer_blink = 0,
         timer_blink_period = 25,
-        real_time_ticks = nil
+        real_time_ticks = nil,
+        flashing = false,
+        on_flash = on_flash,
     }
 
     local get_realtime_completion_ratio = function (realtime_tick_tracker)
@@ -39,10 +41,11 @@ function make_ui_timer()
     end
 
     local should_flash_time = function (realtime_tick_tracker)
-        local realtime_ticks = 0
-        if realtime_tick_tracker != nil then
-            realtime_ticks = realtime_tick_tracker
+        if realtime_tick_tracker == nil then
+            return false
         end
+
+        local realtime_ticks = realtime_tick_tracker
         local flash_start = flr(5 * 60 * 30 / 24)
         local flash_duration_in_ticks = 10
         return (realtime_ticks % flash_start) < flash_duration_in_ticks
@@ -90,6 +93,12 @@ function make_ui_timer()
         if self.real_time_ticks != nil then
             self.real_time_ticks += 1
         end
+
+        local should_flash = should_flash_time(self.real_time_ticks)
+        if should_flash and (not self.flashing) then
+            self.on_flash()
+        end
+        self.flashing = should_flash
     end
 
     local draw_timer = function()
@@ -97,11 +106,10 @@ function make_ui_timer()
         local blink_state = get_timer_blink_state()
         local hide_timer_for_blink = (blink_state != nil) and (not blink_state)
         if not hide_timer_for_blink then
-            local should_flash = should_flash_time(self.real_time_ticks)
             local text_color = Colors.White
             local text_pos_x = 42
             local text_pos_y = 10
-            if should_flash and (blink_state == nil) then
+            if self.flashing and (blink_state == nil) then
                 text_color = Colors.Yellow
                 -- add shake to timer
                 text_pos_x += rnd_incrange(-1, 1)

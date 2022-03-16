@@ -76,7 +76,7 @@ function _init()
         DieLeft = create_anim_flow({70, 70, 238}, 5, 2, true),
         DieRight = create_anim_flow({70, 70, 238}, 5, 2, false),
     }
-    g_ingame_timer = make_ui_timer()
+    g_ingame_timer = make_ui_timer(on_ui_timer_flash)
 
     g_maps = {}
     move_to_level(1)
@@ -149,6 +149,7 @@ function _update()
         -- interact with it.
         if is_digging then
             local reveal_tile_callback = function()
+                sfx(Sfxs.Dig)
                 player_iso_tile.visible = true
                 interact_with_tile(player_iso_tile)
             end
@@ -169,7 +170,12 @@ function interact_with_tile(tile)
             anim = get_die_anim_for_player(g_player),
             respawn_timer = make_ingame_timer(60)
         }
+        sfx(Sfxs.Death)
     end
+end
+
+function on_ui_timer_flash()
+    sfx(Sfxs.ClockBeep)
 end
 
 function is_player_facing_left(player)
