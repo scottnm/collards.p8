@@ -42,7 +42,7 @@ g_map = nil
 g_player = nil
 g_input = nil
 g_player_found_exit_timer = nil
-g_player_respawn_timer = nil
+-- TODO: remove
 g_ingame_timer = nil
 g_anims = nil
 g_camera_player_offset = nil
@@ -73,6 +73,8 @@ function _init()
         WalkDownLeft = create_anim_flow({0, 2, 4}, 10, 2, true),
         DigRight = create_anim_flow({12, 12, 14}, 5, 2, false),
         DigLeft = create_anim_flow({12, 12, 14}, 5, 2, true),
+        DieLeft = create_anim_flow({70, 70, 238}, 5, 2, true),
+        DieRight = create_anim_flow({70, 70, 238}, 5, 2, false),
     }
     g_ingame_timer = make_ui_timer()
 
@@ -114,10 +116,11 @@ function _update()
             move_to_level(g_map.level_id + 1)
         end
         return
-    elseif g_player_respawn_timer != nil then
-        g_player_respawn_timer.update()
-        if g_player_respawn_timer.done() then
-            g_player_respawn_timer = nil
+    elseif g_player.die_state != nil then
+        update_anim(g_player, g_player.die_state.anim)
+        g_player.die_state.respawn_timer.update()
+        if g_player.die_state.respawn_timer.done() then
+            g_player.die_state = nil
             move_to_level(1)
         end
         return
@@ -162,23 +165,35 @@ function interact_with_tile(tile)
     if tile.type == TileType.Finish then
         g_player_found_exit_timer = make_ingame_timer(15)
     elseif tile.type == TileType.Trap then
-        g_player_respawn_timer = make_ingame_timer(30)
+        g_player.die_state = {
+            anim = get_die_anim_for_player(g_player),
+            respawn_timer = make_ingame_timer(60)
+        }
     end
 end
 
-function get_dig_anim_for_player(player)
-    local should_dig_left = (
-        player.anim_state.last_flow == g_anims.IdleLeft or
-        player.anim_state.last_flow == g_anims.WalkLeft or
-        player.anim_state.last_flow == g_anims.IdleUpLeft or
-        player.anim_state.last_flow == g_anims.WalkUpLeft or
-        player.anim_state.last_flow == g_anims.IdleDownLeft or
-        player.anim_state.last_flow == g_anims.WalkDownLeft)
+function is_player_facing_left(player)
+    return (player.anim_state.last_flow == g_anims.IdleLeft or
+            player.anim_state.last_flow == g_anims.WalkLeft or
+            player.anim_state.last_flow == g_anims.IdleUpLeft or
+            player.anim_state.last_flow == g_anims.WalkUpLeft or
+            player.anim_state.last_flow == g_anims.IdleDownLeft or
+            player.anim_state.last_flow == g_anims.WalkDownLeft)
+end
 
-    if should_dig_left then
+function get_dig_anim_for_player(player)
+    if is_player_facing_left(player) then
         return g_anims.DigLeft
     else
         return g_anims.DigRight
+    end
+end
+
+function get_die_anim_for_player(player)
+    if is_player_facing_left(player) then
+        return g_anims.DieLeft
+    else
+        return g_anims.DieRight
     end
 end
 
@@ -264,9 +279,12 @@ function _draw()
     -- draw the level UI
     print("Level: "..g_map.level_id, 0, 120, Colors.White)
     if g_player_found_exit_timer != nil then
-        print("FOUND EXIT", 100, 120, Colors.White)
-    elseif g_player_respawn_timer != nil then
-        print("DIED", 100, 120, Colors.White)
+    elseif g_player.die_state != nil then
+        local bg_rect = { x = 0, y = 40, width = 128, height = 10 }
+        rectfill(bg_rect.x, bg_rect.y, bg_rect.x + bg_rect.width, bg_rect.y + bg_rect.height, Colors.Navy)
+        local text = "DIED"
+        local text_pos = center_text(bg_rect, text)
+        print(text, text_pos.x, text_pos.y, Colors.Red)
     end
 
     -- draw the in-game timer UI
@@ -274,6 +292,15 @@ function _draw()
 
     -- uncomment to display frame stats
     -- dbg_display_frame_stats({ x = 80, y = 80 })
+end
+
+function center_text(rect, text)
+    local text_len = #text
+    local text_pixel_width = 4 * text_len
+    local text_pixel_height = 6
+    local text_start_x = rect.x + (rect.width/2) - (text_pixel_width/2)
+    local text_start_y = rect.y + (rect.height/2) - (text_pixel_height/2)
+    return { x = text_start_x, y = text_start_y }
 end
 
 function dbg_display_frame_stats(pos)
