@@ -55,22 +55,24 @@ function _init()
     g_player.collider = { radius = 3 }
 
     g_anims = {
-        IdleDown = create_anim_flow(34, 1, 10, 2, false),
-        WalkDown = create_anim_flow(32, 3, 10, 2, false),
-        IdleUp = create_anim_flow(40, 1, 10, 2, false),
-        WalkUp = create_anim_flow(38, 3, 10, 2, false),
-        IdleRight = create_anim_flow(66, 1, 10, 2, false),
-        WalkRight = create_anim_flow(64, 3, 10, 2, false),
-        IdleLeft = create_anim_flow(66, 1, 10, 2, true),
-        WalkLeft = create_anim_flow(64, 3, 10, 2, true),
-        IdleUpRight = create_anim_flow(8, 1, 10, 2, false),
-        WalkUpRight = create_anim_flow(6, 3, 10, 2, false),
-        IdleDownRight = create_anim_flow(2, 1, 10, 2, false),
-        WalkDownRight = create_anim_flow(0, 3, 10, 2, false),
-        IdleUpLeft = create_anim_flow(8, 1, 10, 2, true),
-        WalkUpLeft = create_anim_flow(6, 3, 10, 2, true),
-        IdleDownLeft = create_anim_flow(2, 1, 10, 2, true),
-        WalkDownLeft = create_anim_flow(0, 3, 10, 2, true),
+        IdleDown = create_anim_flow({34}, 10, 2, false),
+        WalkDown = create_anim_flow({32, 34, 36}, 10, 2, false),
+        IdleUp = create_anim_flow({40}, 10, 2, false),
+        WalkUp = create_anim_flow({38, 40, 42}, 10, 2, false),
+        IdleRight = create_anim_flow({66}, 10, 2, false),
+        WalkRight = create_anim_flow({64, 66, 68}, 10, 2, false),
+        IdleLeft = create_anim_flow({66}, 10, 2, true),
+        WalkLeft = create_anim_flow({64, 66, 68}, 10, 2, true),
+        IdleUpRight = create_anim_flow({8}, 10, 2, false),
+        WalkUpRight = create_anim_flow({6, 8, 10}, 10, 2, false),
+        IdleDownRight = create_anim_flow({2}, 10, 2, false),
+        WalkDownRight = create_anim_flow({0, 2, 4}, 10, 2, false),
+        IdleUpLeft = create_anim_flow({8}, 10, 2, true),
+        WalkUpLeft = create_anim_flow({6, 8, 10}, 10, 2, true),
+        IdleDownLeft = create_anim_flow({2}, 10, 2, true),
+        WalkDownLeft = create_anim_flow({0, 2, 4}, 10, 2, true),
+        DigRight = create_anim_flow({12, 12, 14}, 5, 2, false),
+        DigLeft = create_anim_flow({12, 12, 14}, 5, 2, true),
     }
     g_ingame_timer = make_ui_timer()
 
@@ -85,8 +87,27 @@ function _update()
     -- update our in-game accelerated timer UI
     g_ingame_timer.update(g_input)
 
-    -- handle the block state
-    if g_player_found_exit_timer != nil then
+    -- handle input blocking animation states
+    if g_player.dig_state != nil then
+        -- update the dig animation
+        update_anim(g_player, g_player.dig_state.anim)
+
+        -- if we just started the 'dig up' portion of our animation,
+        -- fire the on_dig_up callback exactly one
+        if (g_player.anim_state.a_st == 2) and g_player.dig_state.on_dig_up != nil then
+            g_player.dig_state.on_dig_up()
+            g_player.dig_state.on_dig_up = nil
+        end
+
+        -- check if we're done digging yet
+        if g_player.anim_state.loop > 0 then
+            -- reset our animation state to what is was before we started digging
+            reset_anim(g_player)
+            update_anim(g_player, g_player.dig_state.previous_anim)
+            g_player.dig_state = nil
+        end
+        return
+    elseif g_player_found_exit_timer != nil then
         g_player_found_exit_timer.update()
         if g_player_found_exit_timer.done() then
             g_player_found_exit_timer = nil
@@ -105,21 +126,59 @@ function _update()
     move_player(g_input)
     animate_player(g_input)
 
+    local is_digging = g_input.btn_o and g_input.btn_o_change
+
+    if is_digging then
+        g_player.dig_state = {
+            anim = get_dig_anim_for_player(g_player),
+            previous_anim = g_player.anim_state.last_flow }
+        -- reset the anim state so the digging animation always starts on frame 0
+        reset_anim(g_player)
+
+    end
+
     local player_iso_tile_idx = get_player_iso_tile_idx(g_map, g_player)
     if player_iso_tile_idx != nil then
         local player_iso_tile = g_map.isocells[player_iso_tile_idx].tile
-        -- potentially flip the player tile
-        if g_input.btn_o and g_input.btn_o_change then
-            player_iso_tile.visible = true
-        end
 
-        if player_iso_tile.visible then
-            if player_iso_tile.type == TileType.Finish then
-                g_player_found_exit_timer = make_ingame_timer(15)
-            elseif player_iso_tile.type == TileType.Trap then
-                g_player_respawn_timer = make_ingame_timer(30)
+        -- If we've just dug up a tile, we'll set a callback so that after
+        -- the digging animation reveals the tile, we'll automatically
+        -- interact with it.
+        if is_digging then
+            local reveal_tile_callback = function()
+                player_iso_tile.visible = true
+                interact_with_tile(player_iso_tile)
             end
+            g_player.dig_state.on_dig_up = reveal_tile_callback
+        -- If we aren't digging and the tile is already flipped,
+        -- we'll proactively interact with it.
+        elseif player_iso_tile.visible then
+            interact_with_tile(player_iso_tile)
         end
+    end
+end
+
+function interact_with_tile(tile)
+    if tile.type == TileType.Finish then
+        g_player_found_exit_timer = make_ingame_timer(15)
+    elseif tile.type == TileType.Trap then
+        g_player_respawn_timer = make_ingame_timer(30)
+    end
+end
+
+function get_dig_anim_for_player(player)
+    local should_dig_left = (
+        player.anim_state.last_flow == g_anims.IdleLeft or
+        player.anim_state.last_flow == g_anims.WalkLeft or
+        player.anim_state.last_flow == g_anims.IdleUpLeft or
+        player.anim_state.last_flow == g_anims.WalkUpLeft or
+        player.anim_state.last_flow == g_anims.IdleDownLeft or
+        player.anim_state.last_flow == g_anims.WalkDownLeft)
+
+    if should_dig_left then
+        return g_anims.DigLeft
+    else
+        return g_anims.DigRight
     end
 end
 
@@ -189,10 +248,14 @@ function _draw()
     --
     local player_sprite_pos = sprite_pos(g_player)
     draw_anim(g_player, player_sprite_pos)
+    -- uncomment to display anim state for debugging
+    -- dbg_display_anim_state(g_player, { x = 0, y = 60 }, g_anims)
 
+    -- uncomment to display colliders on top of everything for debugging
+    -- dbg_display_colliders()
 
     --
-    -- Draw all fixed UI
+    -- Draw all UI unaffected by the camera
     --
 
     -- reset the camera to 0 keep the UI fixed on screen
@@ -209,17 +272,22 @@ function _draw()
     -- draw the in-game timer UI
     g_ingame_timer.draw()
 
-    -- uncomment to draw colliders on top of everything
-    --circ(g_player.pos.x, g_player.pos.y, g_player.collider.radius, Colors.White)
-    --for cell in all(g_map.isocells) do
-    --    circ(cell.pos.x, cell.pos.y, cell.collider.radius, Colors.White)
-    --end
+    -- uncomment to display frame stats
+    -- dbg_display_frame_stats({ x = 80, y = 80 })
+end
 
-    -- uncomment to dump frame stats
-    -- print("mem:  "..stat(0), 80, 80, Colors.White)
-    -- print("cpu:  "..stat(1), 80, 90, Colors.White)
-    -- print("fps(t): "..stat(8), 80, 100, Colors.White)
-    -- print("fps(a): "..stat(7), 80, 110, Colors.White)
+function dbg_display_frame_stats(pos)
+    print("mem:  "..  stat(0), pos.x, pos.y + 00, Colors.White)
+    print("cpu:  "..  stat(1), pos.x, pos.y + 10, Colors.White)
+    print("fps(t): "..stat(8), pos.x, pos.y + 20, Colors.White)
+    print("fps(a): "..stat(7), pos.x, pos.y + 30, Colors.White)
+end
+
+function dbg_display_colliders()
+    circ(g_player.pos.x, g_player.pos.y, g_player.collider.radius, Colors.White)
+    for cell in all(g_map.isocells) do
+        circ(cell.pos.x, cell.pos.y, cell.collider.radius, Colors.White)
+    end
 end
 
 function draw_hint_arrow(pos_center, hint)
