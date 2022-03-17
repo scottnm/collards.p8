@@ -50,10 +50,12 @@ g_camera_player_offset = nil
 
 function _init()
     g_player = {}
-    g_camera_player_offset = { x = 0, y = 0 }
     g_player.pos = { x = 0, y = 0 }
     g_player.sprite_offset = { x = -8, y = -14 }
     g_player.collider = { radius = 3 }
+    g_player.bomb_count = 0
+
+    g_camera_player_offset = { x = 0, y = 0 }
 
     g_anims = {
         IdleDown = create_anim_flow({34}, 10, 2, false),
@@ -173,6 +175,11 @@ function interact_with_tile(tile)
             respawn_timer = make_ingame_timer(60)
         }
         sfx(Sfxs.Death)
+    elseif tile.type == TileType.BombItem then
+        -- TODO: add an animation for picking up the bomb
+        g_player.bomb_count += 1
+        -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
+        tile.type = TileType.Empty
     end
 end
 
@@ -254,9 +261,15 @@ function _draw()
             spr(128, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y, 4, 2, false)
             spr(frame_idx, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
 
-            -- draw the hint arrow if the empty hint cell is visible
-            if isocell.tile.type == TileType.Empty and isocell.tile.visible then
-                draw_hint_arrow(isocell.pos, isocell.tile.hint)
+            if isocell.tile.visible then
+                -- draw the hint arrow if the empty hint cell is visible
+                if isocell.tile.type == TileType.Empty then
+                    draw_hint_arrow(isocell.pos, isocell.tile.hint)
+                -- If it's an unretrieved bomb cell, display an inactive bomb sprite in the middle of the cell.
+                -- N.B. this basically only happens if you use a bomb to reveal another bomb.
+                elseif isocell.tile.type == TileType.BombItem then
+                    draw_bomb_item_on_floor(isocell.pos)
+                end
             end
         end
     end
@@ -295,6 +308,9 @@ function _draw()
         print(text, text_pos.x, text_pos.y, Colors.Red)
     end
 
+    -- TODO: draw better bomb ui. for now just put it on screen as text
+    print("BOMB: "..g_player.bomb_count, 0, 110, Colors.White)
+
     -- draw the in-game timer UI
     g_ingame_timer.draw()
 
@@ -327,9 +343,8 @@ end
 
 function draw_hint_arrow(pos_center, hint)
     local arrow_tile_px_size = 8
-    local pos = {
-        x = pos_center.x - (arrow_tile_px_size/2),
-        y = pos_center.y - (arrow_tile_px_size/2) }
+    local pos_x = pos_center.x - (arrow_tile_px_size/2)
+    local pos_y = pos_center.y - (arrow_tile_px_size/2)
 
     local frame = nil
     local flip_x = nil
@@ -369,7 +384,15 @@ function draw_hint_arrow(pos_center, hint)
         flip_y = false
     end
 
-    spr(frame, pos.x, pos.y, 1, 1, flip_x, flip_y)
+    spr(frame, pos_x, pos_y, 1, 1, flip_x, flip_y)
+end
+
+function draw_bomb_item_on_floor(pos_center)
+    local bomb_tile_px_size = 8
+    local pos_x = pos_center.x - (bomb_tile_px_size/2)
+    local pos_y = pos_center.y - (bomb_tile_px_size/2)
+
+    spr(74, pos_x, pos_y, 1, 1)
 end
 
 function generate_maps(num_maps)
