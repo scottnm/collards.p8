@@ -52,6 +52,7 @@ g_player_found_exit_timer = nil
 g_ingame_timer = nil
 g_anims = nil
 g_camera_player_offset = nil
+g_bombs = nil
 
 function _init()
     g_player = {}
@@ -177,6 +178,12 @@ function _update()
         elseif player_iso_tile.visible then
             interact_with_tile(player_iso_tile)
         end
+    end
+
+    local throw_bomb = g_input.btn_x and g_input.btn_x_change
+
+    if throw_bomb then
+        local look_vec = get_player_unit_look_vector(
     end
 end
 
@@ -660,11 +667,11 @@ function move_player(input)
             movement_y = 0
         end
     elseif g_input.btn_up then
-            movement_x = 0
-            movement_y = -1
+        movement_x = 0
+        movement_y = -1
     elseif g_input.btn_down then
-            movement_x = 0
-            movement_y = 1
+        movement_x = 0
+        movement_y = 1
     else
         return
     end
