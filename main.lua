@@ -861,6 +861,51 @@ function highlight_player_iso_tile(map, player_tile_idx)
     line(line_points[4].x, line_points[4].y, line_points[1].x, line_points[1].y, Colors.White)
 end
 
+function get_player_unit_look_vector(player)
+    -- when traveling diagnonally, multiply by the factor sqrt(0.5) to avoid traveling further by going diagonally
+    local sqrt_half = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
+    -- N.B. Here the 'unit' vector is scaled based on the distortions of the map.
+    -- i.e. the x-axis is twice as long as the y-axis
+    local look_x = nil
+    local look_y = nil
+    if     (player.anim_state.last_flow == g_anims.WalkLeft or
+            player.anim_state.last_flow == g_anims.IdleLeft) then
+        look_x = -2
+        look_y = 0
+    elseif (player.anim_state.last_flow == g_anims.WalkDownLeft or
+            player.anim_state.last_flow == g_anims.IdleDownLeft) then
+        look_x = -2 * sqrt_half
+        look_y = sqrt_half
+    elseif (player.anim_state.last_flow == g_anims.WalkDown or
+            player.anim_state.last_flow == g_anims.IdleDown) then
+        look_x = 0
+        look_y = 1
+    elseif (player.anim_state.last_flow == g_anims.WalkDownRight or
+            player.anim_state.last_flow == g_anims.IdleDownRight) then
+        look_x = 2 * sqrt_half
+        look_y = sqrt_half
+    elseif (player.anim_state.last_flow == g_anims.WalkRight or
+            player.anim_state.last_flow == g_anims.IdleRight) then
+        look_x = 2
+        look_y = 0
+    elseif (player.anim_state.last_flow == g_anims.WalkUpRight or
+            player.anim_state.last_flow == g_anims.IdleUpRight) then
+        look_x = 2 * sqrt_half
+        look_y = -1 * sqrt_half
+    elseif (player.anim_state.last_flow == g_anims.WalkUp or
+            player.anim_state.last_flow == g_anims.IdleUp) then
+        look_x = 0
+        look_y = -1
+    elseif (player.anim_state.last_flow == g_anims.WalkUpLeft or
+            player.anim_state.last_flow == g_anims.IdleUpLeft) then
+        look_x = -2 * sqrt_half
+        look_y = -1 * sqrt_half
+    else
+        look_x = 0
+        look_y = 1
+    end
+end
+
 function isomap_row_cnt(map)
     return map.iso_width * 2 - 1
 end
