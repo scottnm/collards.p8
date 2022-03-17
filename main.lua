@@ -451,17 +451,17 @@ function generate_level(level_id, map_iso_width)
 
     -- generate the iso trap cells. Generate 30% of the map as trap cells
     local trap_cell_cnt = flr(next_map.iso_width * next_map.iso_width * 0.30)
-    for i = 1,trap_cell_cnt do
-        local next_trap_cell_idx = select_random_empty_isomap_tile_idx(next_map)
-        next_map.isocells[next_trap_cell_idx].tile = make_tile(false, TileType.Trap)
+    local trap_cells = select_random_empty_tiles({next_map}, trap_cell_cnt)
+    for selected_cells in all(trap_cells) do
+        next_map.isocells[selected_cells.idx].tile = make_tile(false, TileType.Trap)
     end
 
     -- generate the player start position on an isotile
-    next_map.player_start_iso_idx = select_random_empty_isomap_tile_idx(next_map)
+    next_map.player_start_iso_idx = select_random_empty_tile_idx_from_map(next_map)
     next_map.isocells[next_map.player_start_iso_idx].tile = make_tile(true, TileType.Start)
 
     -- place the iso finish
-    local iso_finish_cell_idx = select_random_empty_isomap_tile_idx(next_map)
+    local iso_finish_cell_idx = select_random_empty_tile_idx_from_map(next_map)
     next_map.isocells[iso_finish_cell_idx].tile = make_tile(false, TileType.Finish)
 
     -- now that we've placed the finish cell, update all the empty cells with hints
@@ -504,20 +504,35 @@ function make_tile(visible, tile_type)
     return { visible = visible, type = tile_type }
 end
 
-function select_random_empty_isomap_tile_idx(map)
-    local idx = 1
-    local choice_cnt = 0
-    local choices = {}
-    for cell in all(map.isocells) do
-        if cell.tile.type == TileType.Empty then
-            add(choices, idx)
-            choice_cnt += 1
+function select_random_empty_tile_idx_from_map(map)
+    return select_random_empty_tiles({map}, 1)[1].idx
+end
+
+function select_random_empty_tiles(maps, select_count)
+    local empty_cell_cnt = 0
+    local empty_cells = {}
+    for map in all(maps) do
+        for cell in all(map.isocells) do
+            if cell.tile.type == TileType.Empty then
+                add(empty_cells, { map = map, idx = cell.idx })
+                empty_cell_cnt += 1
+            end
         end
-        idx += 1
     end
 
-    local rnd_choice_index = rnd_incrange(1, choice_cnt)
-    return choices[rnd_choice_index]
+    local selected_cells = {}
+    for i=1,select_count do
+        local next_selected_empty_cell_idx = rnd_incrange(1, empty_cell_cnt)
+
+        -- take the selected cell and update our collection so we have one less cell to select from
+        local next_selected_empty_cell = empty_cells[next_selected_empty_cell_idx]
+        empty_cells[next_selected_empty_cell_idx] = empty_cells[empty_cell_cnt]
+        empty_cells[empty_cell_cnt] = nil
+
+        add(selected_cells, next_selected_empty_cell)
+    end
+
+    return selected_cells
 end
 
 function get_iso_tile_sprite_frame(tile)
