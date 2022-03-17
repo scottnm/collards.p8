@@ -9,6 +9,11 @@ TileType = {
     BombItem = 6,
 }
 
+ItemType = {
+    Bomb = 1,
+    NoteFrag = 2,
+}
+
 HintArrow = {
     Up = 1,
     UpRight = 2,
@@ -78,6 +83,7 @@ function _init()
         DigLeft = create_anim_flow({12, 12, 14}, 5, 2, true),
         DieLeft = create_anim_flow({70, 70, 238}, 5, 2, true),
         DieRight = create_anim_flow({70, 70, 238}, 5, 2, false),
+        CollectItem = create_anim_flow({46}, 1, 2, false),
     }
     g_ingame_timer = make_ui_timer(on_ui_timer_flash)
 
@@ -111,6 +117,14 @@ function _update()
             reset_anim(g_player)
             update_anim(g_player, g_player.dig_state.previous_anim)
             g_player.dig_state = nil
+        end
+        return
+    elseif g_player.collect_item_state != nil then
+        -- update the collect bomb animation
+        update_anim(g_player, g_player.collect_item_state.anim)
+        g_player.collect_item_state.anim_timer.update()
+        if g_player.collect_item_state.anim_timer.done() then
+            g_player.collect_item_state = nil
         end
         return
     elseif g_player_found_exit_timer != nil then
@@ -178,6 +192,11 @@ function interact_with_tile(tile)
     elseif tile.type == TileType.BombItem then
         -- TODO: add an animation for picking up the bomb
         g_player.bomb_count += 1
+        g_player.collect_item_state = {
+            anim = g_anims.CollectItem,
+            item = ItemType.Bomb,
+            anim_timer = make_ingame_timer(30),
+        }
         -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
         tile.type = TileType.Empty
     end
@@ -263,12 +282,12 @@ function _draw()
 
             if isocell.tile.visible then
                 -- draw the hint arrow if the empty hint cell is visible
-                if isocell.tile.type == TileType.Empty then
+                if (isocell.tile.type == TileType.Empty) and (isocell.tile.hint != nil) then
                     draw_hint_arrow(isocell.pos, isocell.tile.hint)
                 -- If it's an unretrieved bomb cell, display an inactive bomb sprite in the middle of the cell.
                 -- N.B. this basically only happens if you use a bomb to reveal another bomb.
                 elseif isocell.tile.type == TileType.BombItem then
-                    draw_bomb_item_on_floor(isocell.pos)
+                    draw_bomb_item(isocell.pos)
                 end
             end
         end
@@ -284,6 +303,15 @@ function _draw()
     --
     local player_sprite_pos = sprite_pos(g_player)
     draw_anim(g_player, player_sprite_pos)
+
+    -- if the player is collecting an item, draw the item above their collect animation
+    if g_player.collect_item_state != nil then
+        local item_pos = add_vec2(g_player.pos, { x = 0, y = -16 })
+        if g_player.collect_item_state.item == ItemType.Bomb then
+            draw_bomb_item(item_pos)
+        end
+    end
+
     -- uncomment to display anim state for debugging
     -- dbg_display_anim_state(g_player, { x = 0, y = 60 }, g_anims)
 
@@ -342,10 +370,6 @@ function dbg_display_colliders()
 end
 
 function draw_hint_arrow(pos_center, hint)
-    local arrow_tile_px_size = 8
-    local pos_x = pos_center.x - (arrow_tile_px_size/2)
-    local pos_y = pos_center.y - (arrow_tile_px_size/2)
-
     local frame = nil
     local flip_x = nil
     local flip_y = nil
@@ -384,15 +408,17 @@ function draw_hint_arrow(pos_center, hint)
         flip_y = false
     end
 
-    spr(frame, pos_x, pos_y, 1, 1, flip_x, flip_y)
+    spr_centered(frame, pos_center.x, pos_center.y, 1, 1, flip_x, flip_y)
 end
 
-function draw_bomb_item_on_floor(pos_center)
-    local bomb_tile_px_size = 8
-    local pos_x = pos_center.x - (bomb_tile_px_size/2)
-    local pos_y = pos_center.y - (bomb_tile_px_size/2)
+function draw_bomb_item(pos_center)
+    spr_centered(74, pos_center.x, pos_center.y, 1, 1)
+end
 
-    spr(74, pos_x, pos_y, 1, 1)
+function spr_centered(frame, x, y, tile_width, tile_height, flip_x, flip_y)
+    flip_x = flip_x or false
+    flip_y = flip_y or false
+    spr(frame, x - (tile_width * 8/2), y - (tile_height * 8/2), tile_width, tile_height, flip_x, flip_y)
 end
 
 function generate_maps(num_maps)
@@ -598,7 +624,7 @@ function move_to_level(next_level)
     g_map = g_maps[next_level]
 
     -- place the player on the center of the iso tile
-    g_player.pos = copy_pos(g_map.isocells[g_map.player_start_iso_idx].pos)
+    g_player.pos = copy_vec2(g_map.isocells[g_map.player_start_iso_idx].pos)
     -- place the camera on top of the player
     g_camera_player_offset = get_centered_camera_on_player(g_player)
 
@@ -648,7 +674,7 @@ function move_player(input)
     movement_y *= player_speed
 
     -- copy the old position in case we need to roll back
-    local old_player_pos = copy_pos(g_player.pos)
+    local old_player_pos = copy_vec2(g_player.pos)
 
     -- move the player, check if they've moved onto a fall tile
     local move_candidates = {}
@@ -727,10 +753,6 @@ function animate_player(input)
     end
 
     update_anim(g_player, anim)
-end
-
-function copy_pos(pos)
-    return { x = pos.x, y = pos.y }
 end
 
 function sprite_pos(obj)
@@ -836,10 +858,14 @@ function isomap_row_cnt(map)
     return map.iso_width * 2 - 1
 end
 
-function add_vec2(p1, p2)
-    return { x = p1.x + p2.x, y = p1.y + p2.y }
+function copy_vec2(v)
+    return { x = v.x, y = v.y }
 end
 
-function sub_vec2(p1, p2)
-    return { x = p1.x - p2.x, y = p1.y - p2.y }
+function add_vec2(v1, v2)
+    return { x = v1.x + v2.x, y = v1.y + v2.y }
+end
+
+function sub_vec2(v1, v2)
+    return { x = v1.x - v2.x, y = v1.y - v2.y }
 end
