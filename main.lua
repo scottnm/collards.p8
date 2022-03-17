@@ -78,7 +78,8 @@ function _init()
     }
     g_ingame_timer = make_ui_timer(on_ui_timer_flash)
 
-    g_maps = {}
+    -- TODO: sometimes I refer to these as maps. Sometimes as levels. I should fix this. It's confusing
+    g_maps = generate_maps(10)
     move_to_level(1)
 end
 
@@ -370,9 +371,22 @@ function draw_hint_arrow(pos_center, hint)
     spr(frame, pos.x, pos.y, 1, 1, flip_x, flip_y)
 end
 
+function generate_maps(num_maps)
+    local maps = {}
+
+    for i=1,10 do
+        -- the first level has map size 2
+        -- the largest map is size MAX_TILE_LINE()
+        local map_size_for_level = min((i + 1), MAX_TILE_LINE())
+        add(maps, generate_level(i, map_size_for_level))
+    end
+
+    return maps
+end
+
 function move_to_level(next_level)
     -- update the current map
-    change_level(next_level)
+    g_map = g_maps[next_level]
 
     -- place the player on the center of the iso tile
     g_player.pos = copy_pos(g_map.isocells[g_map.player_start_iso_idx].pos)
@@ -383,24 +397,11 @@ function move_to_level(next_level)
     update_anim(g_player, g_anims.IdleDown)
 end
 
-function change_level(next_level)
-    -- if we've already visited this level, use it rather than generating a new level
-    if g_maps[next_level] != nil then
-        g_map = g_maps[next_level]
-        return
-    end
-
+function generate_level(level_id, map_iso_width)
     -- generate a new map
     local next_map = {}
-    next_map.level_id = next_level
-
-    -- update the map size
-    if g_maps[next_level - 1] != nil then
-        local prev_map = g_maps[next_level - 1]
-        next_map.iso_width = min(prev_map.iso_width + 1, MAX_TILE_LINE())
-    else
-        next_map.iso_width = 2
-    end
+    next_map.level_id = level_id
+    next_map.iso_width = map_iso_width
 
     -- generate the isomap. initialize all at the start to empty
     next_map.isocells = {}
@@ -496,8 +497,7 @@ function change_level(next_level)
         end
     end
 
-    g_maps[next_level] = next_map
-    g_map = next_map
+    return next_map
 end
 
 function make_tile(visible, tile_type)
