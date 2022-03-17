@@ -6,6 +6,7 @@ TileType = {
     Finish = 3,
     Trap = 4,
     Fall = 5,
+    BombItem = 6,
 }
 
 HintArrow = {
@@ -378,26 +379,85 @@ function generate_maps(num_maps)
         -- the first level has map size 2
         -- the largest map is size MAX_TILE_LINE()
         local map_size_for_level = min((i + 1), MAX_TILE_LINE())
-        add(maps, generate_level(i, map_size_for_level))
+        add(maps, generate_empty_level(i, map_size_for_level))
+    end
+
+    -- generate the trap cells in each map
+    -- On each map, %30 of the tiles rounded down have traps
+    for map in all(maps) do
+        local trap_cell_cnt = flr(map.iso_width * map.iso_width * 0.30)
+        local trap_cells = select_random_empty_tiles({map}, trap_cell_cnt)
+        for trap_cell in all(trap_cells) do
+            map.isocells[trap_cell.idx].tile = make_tile(false, TileType.Trap)
+        end
+    end
+
+    -- generate the bomb item cells
+    -- There are a total of 10 bombs across the whole game
+    local bomb_cell_cnt = 10
+    local bomb_cells = select_random_empty_tiles(maps, bomb_cell_cnt)
+    for bomb_cell in all(bomb_cells) do
+        bomb_cell.map.isocells[bomb_cell.idx].tile = make_tile(false, TileType.BombItem)
+    end
+
+    -- Place the start and end tile on each map
+    for map in all(maps) do
+        -- set the start cell on this map.
+        map.player_start_iso_idx = select_random_empty_tile_idx_from_map(map)
+        map.isocells[map.player_start_iso_idx].tile = make_tile(true, TileType.Start)
+
+        -- set the finish cell on this map.
+        map.finish_cell_idx = select_random_empty_tile_idx_from_map(map)
+        map.isocells[map.finish_cell_idx].tile = make_tile(false, TileType.Finish)
+    end
+
+    -- Lastly, now that all interesting cells have been placed, fill in the remaining empty
+    -- cells with hint arrows
+    for map in all(maps) do
+        local iso_finish_cell_pos = map.isocells[map.finish_cell_idx].pos
+        for cell in all(map.isocells) do
+            if cell.tile.type == TileType.Empty then
+                local dir_vector = sub_vec2(iso_finish_cell_pos, cell.pos)
+                local unit_circle_ratio = atan2(dir_vector.x, -1 * dir_vector.y)
+                local angle_to_finish_point_deg = unit_circle_ratio * 360
+
+                local hint_arrow = nil
+                if     angle_to_finish_point_deg <  22.5 then
+                    hint_arrow = HintArrow.Right
+                elseif angle_to_finish_point_deg <  67.5 then
+                    hint_arrow = HintArrow.DownRight
+                elseif angle_to_finish_point_deg < 112.5 then
+                    hint_arrow = HintArrow.Down
+                elseif angle_to_finish_point_deg < 157.5 then
+                    hint_arrow = HintArrow.DownLeft
+                elseif angle_to_finish_point_deg < 202.5 then
+                    hint_arrow = HintArrow.Left
+                elseif angle_to_finish_point_deg < 247.5 then
+                    hint_arrow = HintArrow.UpLeft
+                elseif angle_to_finish_point_deg < 292.5 then
+                    hint_arrow = HintArrow.Up
+                elseif angle_to_finish_point_deg < 337.5 then
+                    hint_arrow = HintArrow.UpRight
+                else
+                    hint_arrow = HintArrow.Right
+                end
+
+                cell.tile.hint = hint_arrow
+            end
+        end
+    end
+
+    -- uncomment this to make all tiles visible at start
+    for map in all(maps) do
+        for cell in all(map.isocells) do
+            cell.tile.visible = true
+        end
     end
 
     return maps
 end
 
-function move_to_level(next_level)
-    -- update the current map
-    g_map = g_maps[next_level]
-
-    -- place the player on the center of the iso tile
-    g_player.pos = copy_pos(g_map.isocells[g_map.player_start_iso_idx].pos)
-    -- place the camera on top of the player
-    g_camera_player_offset = get_centered_camera_on_player(g_player)
-
-    -- reset the player's animation
-    update_anim(g_player, g_anims.IdleDown)
-end
-
-function generate_level(level_id, map_iso_width)
+function generate_empty_level(level_id, map_iso_width)
     -- generate a new map
     local next_map = {}
     next_map.level_id = level_id
@@ -446,54 +506,6 @@ function generate_level(level_id, map_iso_width)
 
             add(next_map.isocells, cell)
             idx += 1
-        end
-    end
-
-    -- generate the iso trap cells. Generate 30% of the map as trap cells
-    local trap_cell_cnt = flr(next_map.iso_width * next_map.iso_width * 0.30)
-    local trap_cells = select_random_empty_tiles({next_map}, trap_cell_cnt)
-    for selected_cells in all(trap_cells) do
-        next_map.isocells[selected_cells.idx].tile = make_tile(false, TileType.Trap)
-    end
-
-    -- generate the player start position on an isotile
-    next_map.player_start_iso_idx = select_random_empty_tile_idx_from_map(next_map)
-    next_map.isocells[next_map.player_start_iso_idx].tile = make_tile(true, TileType.Start)
-
-    -- place the iso finish
-    local iso_finish_cell_idx = select_random_empty_tile_idx_from_map(next_map)
-    next_map.isocells[iso_finish_cell_idx].tile = make_tile(false, TileType.Finish)
-
-    -- now that we've placed the finish cell, update all the empty cells with hints
-    local iso_finish_cell_pos = next_map.isocells[iso_finish_cell_idx].pos
-    for cell in all(next_map.isocells) do
-        if cell.tile.type == TileType.Empty then
-            local dir_vector = sub_vec2(iso_finish_cell_pos, cell.pos)
-            local unit_circle_ratio = atan2(dir_vector.x, -1 * dir_vector.y)
-            local angle_to_finish_point_deg = unit_circle_ratio * 360
-
-            local hint_arrow = nil
-            if     angle_to_finish_point_deg <  22.5 then
-                hint_arrow = HintArrow.Right
-            elseif angle_to_finish_point_deg <  67.5 then
-                hint_arrow = HintArrow.DownRight
-            elseif angle_to_finish_point_deg < 112.5 then
-                hint_arrow = HintArrow.Down
-            elseif angle_to_finish_point_deg < 157.5 then
-                hint_arrow = HintArrow.DownLeft
-            elseif angle_to_finish_point_deg < 202.5 then
-                hint_arrow = HintArrow.Left
-            elseif angle_to_finish_point_deg < 247.5 then
-                hint_arrow = HintArrow.UpLeft
-            elseif angle_to_finish_point_deg < 292.5 then
-                hint_arrow = HintArrow.Up
-            elseif angle_to_finish_point_deg < 337.5 then
-                hint_arrow = HintArrow.UpRight
-            else
-                hint_arrow = HintArrow.Right
-            end
-
-            cell.tile.hint = hint_arrow
         end
     end
 
@@ -546,13 +558,29 @@ function get_iso_tile_sprite_frame(tile)
         elseif tile.type == TileType.Trap then
             return 76
         elseif tile.type == TileType.Fall then
+            --- return nil so we don't draw any sprites
             return nil
+        elseif tile.type == TileType.BombItem then
+            return 160
         else
             return nil
         end
     else
         return 96
     end
+end
+
+function move_to_level(next_level)
+    -- update the current map
+    g_map = g_maps[next_level]
+
+    -- place the player on the center of the iso tile
+    g_player.pos = copy_pos(g_map.isocells[g_map.player_start_iso_idx].pos)
+    -- place the camera on top of the player
+    g_camera_player_offset = get_centered_camera_on_player(g_player)
+
+    -- reset the player's animation
+    update_anim(g_player, g_anims.IdleDown)
 end
 
 function move_player(input)
