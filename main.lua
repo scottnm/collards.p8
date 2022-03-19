@@ -1,5 +1,11 @@
 -- main.lua - main game logic
 
+GameStateType = {
+    PreGame = 1,
+    MainGame = 2,
+    LoseGame = 3,
+}
+
 TileType = {
     Empty = 1,
     Start = 2,
@@ -52,12 +58,24 @@ g_map = nil
 g_player = nil
 g_input = nil
 g_player_found_exit_timer = nil
-g_ingame_timer = nil
+g_game_state = nil
+g_game_timer_ui = nil
 g_anims = nil
 g_camera_player_offset = nil
 g_bombs = nil
+g_lose_game_state = nil
+
+g_maingame_tick_count = 0
+g_maingame_time_limit = (5 * 60 * 30) -- five minutes worth of ticks
 
 function _init()
+    reset()
+end
+
+function reset()
+    g_maingame_tick_count = 0
+    g_game_state = GameStateType.PreGame
+    g_lose_game_state = nil
     g_player = {}
     g_player.pos = { x = 0, y = 0 }
     g_player.sprite_offset = { x = -8, y = -14 }
@@ -91,7 +109,8 @@ function _init()
         CollectItem = create_anim_flow({46}, 1, 2, false),
         BombCountdown = create_anim_flow({74, 74, 74, 74, 74, 74, 74, 75, 74, 74, 75, 74, 74, 75, 74}, 15, 1, false),
     }
-    g_ingame_timer = make_ui_timer(on_ui_timer_flash)
+    g_game_timer_ui = make_ui_timer(on_ui_timer_flash, g_maingame_time_limit)
+    g_game_timer_ui.set_blinking(true)
 
     -- TODO: sometimes I refer to these as maps. Sometimes as levels. I should fix this. It's confusing
     g_maps = generate_maps(10)
@@ -102,8 +121,36 @@ function _update()
     -- get input
     g_input = poll_input(g_input)
 
+    if g_game_state == GameStateType.MainGame then
+        main_game_update(g_input)
+    elseif g_game_state == GameStateType.PreGame then
+        pre_game_update(g_input)
+    elseif g_game_state == GameStateType.LoseGame then
+        lose_game_update(g_input)
+    end
+end
+
+function pre_game_update(input)
+    local any_btn = (
+       input.btn_left or
+       input.btn_right or
+       input.btn_up or
+       input.btn_down or
+       input.btn_o or
+       input.btn_x)
+
+    g_game_timer_ui.update(g_maingame_tick_count)
+    if any_btn then
+        g_game_timer_ui.set_blinking(false)
+        g_game_state = GameStateType.MainGame
+    end
+end
+
+function main_game_update(input)
+    g_maingame_tick_count += 1
+
     -- update our in-game accelerated timer UI
-    g_ingame_timer.update(g_input)
+    g_game_timer_ui.update(g_maingame_tick_count)
 
     -- handle input blocking animation states
     local block_input = false
@@ -153,7 +200,7 @@ function _update()
 
     -- if we aren't blocking new input process it
     if not block_input then
-        handle_new_input(g_input)
+        handle_new_input(input)
     end
 
     -- update bomb states. We update these regardless of input blocks because bomb updates
@@ -181,6 +228,15 @@ function _update()
     -- clean up any bombs which have finished
     for bomb in all(finished_bombs) do
         del(g_bombs, bomb)
+    end
+
+    if g_maingame_tick_count >= g_maingame_time_limit then
+        g_lose_game_state = {
+            substate = "scroll_timer",
+            timer_scroll = 0,
+        }
+        g_game_state = GameStateType.LoseGame
+        g_game_timer_ui.set_blinking(true)
     end
 end
 
@@ -334,7 +390,41 @@ function camera_follow_player(player, camera_ofs)
     camera_ofs.y = new_ofs.y - 64
 end
 
+function lose_game_update(input)
+    g_game_timer_ui.update(g_maingame_tick_count)
+
+    if g_lose_game_state.substate == "scroll_timer" then
+        g_lose_game_state.timer_scroll += 1
+        g_game_timer_ui.move(0, 0.5)
+        if g_lose_game_state.timer_scroll == 120 then
+            g_lose_game_state.substate = "brief_blink"
+            g_lose_game_state.final_blink = make_ingame_timer(120)
+        end
+    elseif g_lose_game_state.substate == "brief_blink" then
+        g_lose_game_state.final_blink.update()
+        if g_lose_game_state.final_blink.done() then
+            g_lose_game_state.substate = "display_lose_text"
+            g_lose_game_state.lose_text_roll_timer = make_ingame_timer(240)
+            g_lose_game_state.lose_text = "you were unable to make\nyour way to the bottom\nof the cavern in time.\n\nyour family's most\ncherished heirloom is\nlost. gone forever.\n\nthis is unacceptable.\nwe'll have to try again.\n\nx/c - to reset"
+        end
+    elseif g_lose_game_state.substate == "display_lose_text" then
+        g_lose_game_state.lose_text_roll_timer.update()
+        if g_lose_game_state.lose_text_roll_timer.done() and (input.btn_x or input.btn_o) then
+            reset()
+        end
+    end
+end
+
 function _draw()
+    if g_game_state == GameStateType.MainGame or
+       g_game_state == GameStateType.PreGame then
+       draw_game()
+    elseif g_game_state == GameStateType.LoseGame then
+        draw_lose_game()
+    end
+end
+
+function draw_game()
     cls(Colors.BLACK)
 
     -- Set the camera view so that the world is draw relative to its position
@@ -433,10 +523,38 @@ function _draw()
     print(":"..g_player.bomb_count, 8, 110, Colors.White)
 
     -- draw the in-game timer UI
-    g_ingame_timer.draw()
+    g_game_timer_ui.draw(g_maingame_tick_count)
 
     -- uncomment to display frame stats
     -- dbg_display_frame_stats({ x = 80, y = 80 })
+end
+
+function draw_lose_game()
+    cls(Colors.BLACK)
+
+    if g_lose_game_state.substate != "display_lose_text" then
+        -- Set the camera view so that the world is draw relative to its position
+        camera_follow_player(g_player, g_camera_player_offset)
+        camera(g_camera_player_offset.x, g_camera_player_offset.y);
+
+        -- draw the player frozen at the lose state
+        local player_sprite_pos = sprite_pos(g_player)
+        draw_anim(g_player, player_sprite_pos)
+
+        -- reset the camera to 0 keep the UI fixed on screen
+        camera(0, 0)
+
+        -- draw the level UI
+        print("Level: "..g_map.level_id, 0, 120, Colors.White)
+
+        -- draw the in-game timer UI
+        g_game_timer_ui.draw(g_maingame_tick_count)
+    else
+        local rolled_text_ratio = g_lose_game_state.lose_text_roll_timer.get_elapsed_ratio()
+        local end_char = flr((#g_lose_game_state.lose_text) * rolled_text_ratio)
+        local lose_text = sub(g_lose_game_state.lose_text, 1, end_char)
+        print(lose_text, 10, 10, Colors.White)
+    end
 end
 
 function center_text(rect, text)
@@ -1194,3 +1312,5 @@ end
 --         pages graphic)
 -- title screen
 -- SUPPOERT ITEMTYPE.BOOK in ALL PLACES IN CODE WHERE ITEMTYPE.PAGE/BOMB
+-- last minute ideas. a trap which disorients you
+-- last minute ideas. an item which slows down time for a bit

@@ -2,61 +2,68 @@
 
 function make_ingame_timer(num_frames)
     local self = {
-        frames_left = num_frames
+        frames = 0,
+        num_frames = num_frames,
     }
 
     local update = function()
-        if self.frames_left != 0 then
-            self.frames_left -= 1
+        if self.frames < self.num_frames then
+            self.frames += 1
         end
     end
 
     local done = function()
-        return self.frames_left == 0
+        return self.frames >= self.num_frames
+    end
+
+    local get_elapsed_ratio = function()
+        return self.frames / self.num_frames
     end
 
     return {
+        get_elapsed_ratio = get_elapsed_ratio,
         update = update,
         done = done
     }
 end
 
-function make_ui_timer(on_flash)
+function make_ui_timer(on_shake, total_ticks)
     local self = {
-        timer_blink = 0,
-        timer_blink_period = 25,
+        blinking = true,
+        blink_ticks = 0,
+        blink_period = 25,
         real_time_ticks = nil,
-        flashing = false,
-        on_flash = on_flash,
+        shaking = false,
+        on_shake = on_shake,
+        total_ticks = total_ticks,
+        pos_x = 42,
+        pos_y = 10,
     }
 
-    local get_realtime_completion_ratio = function (realtime_tick_tracker)
-        local realtime_ticks = 0
-        if realtime_tick_tracker != nil then
-            realtime_ticks = realtime_tick_tracker
-        end
-
-        local total_realtime_ticks = (5 * 60 * 30) -- five minutes worth of ticks
-        return realtime_ticks / total_realtime_ticks
+    local get_timer_completion_ratio = function (current_tick_count)
+        return current_tick_count / self.total_ticks
     end
 
-    local should_flash_time = function (realtime_tick_tracker)
-        if realtime_tick_tracker == nil then
+    local should_shake_time = function (current_tick_count)
+        if current_tick_count == 0 or current_tick_count == self.total_ticks then
             return false
         end
 
-        local realtime_ticks = realtime_tick_tracker
-        local flash_start = flr(5 * 60 * 30 / 24)
-        local flash_duration_in_ticks = 10
-        return (realtime_ticks % flash_start) < flash_duration_in_ticks
+        local shake_start = flr(self.total_ticks / 24)
+        local shake_duration_in_ticks = 10
+        return (current_tick_count % shake_start) < shake_duration_in_ticks
     end
 
-    local get_timer_blink_state = function ()
-        if self.timer_blink == nil then
-            return nil
+    local set_blinking = function(blinking)
+        self.blinking = blinking
+    end
+
+    local hide_timer_for_blink = function ()
+        if not self.blinking then
+            return false
         end
 
-        return self.timer_blink < self.timer_blink_period
+        return self.blink_ticks >= self.blink_period
     end
 
     local generate_timestamp = function (time_in_minutes)
@@ -68,69 +75,63 @@ function make_ui_timer(on_flash)
         return { Hours = hrs_part, Minutes = minutes_part, Seconds = seconds_part }
     end
 
-    local update_timer = function (input)
-        if self.real_time_ticks == nil then
-            local any_btn_change = (input.btn_left_change or
-               input.btn_right_change or
-               input.btn_up_change or
-               input.btn_down_change or
-               input.btn_o_change or
-               input.btn_x_change)
-
-            if any_btn_change then
-                self.real_time_ticks = 0
-                self.timer_blink = nil
-            end
-        end
-
-        if self.timer_blink != nil then
-            self.timer_blink += 1
-            if self.timer_blink > (self.timer_blink_period * 1.5) then
-                self.timer_blink = 0
-            end
-        end
-
-        if self.real_time_ticks != nil then
-            self.real_time_ticks += 1
-        end
-
-        local should_flash = should_flash_time(self.real_time_ticks)
-        if should_flash and (not self.flashing) then
-            self.on_flash()
-        end
-        self.flashing = should_flash
+    local start_timer = function()
+        self.started = true
     end
 
-    local draw_timer = function()
-        -- render the timer
-        local blink_state = get_timer_blink_state()
-        local hide_timer_for_blink = (blink_state != nil) and (not blink_state)
-        if not hide_timer_for_blink then
-            local text_color = Colors.White
-            local text_pos_x = 42
-            local text_pos_y = 10
-            if self.flashing and (blink_state == nil) then
-                text_color = Colors.Yellow
-                -- add shake to timer
-                text_pos_x += rnd_incrange(-1, 1)
-                text_pos_y += rnd_incrange(-1, 1)
+    local update_timer = function (current_tick_count)
+        if self.blinking then
+            self.blink_ticks += 1
+            if self.blink_ticks > (self.blink_period * 1.5) then
+                self.blink_ticks = 0
             end
-
-            local time_elapsed_ratio = get_realtime_completion_ratio(self.real_time_ticks)
-            local ingame_total_minutes = (24 * 60)
-            local time_remaining_minutes = (1 - time_elapsed_ratio) * ingame_total_minutes
-            local time_remaining_parts = generate_timestamp(time_remaining_minutes)
-
-            local timer_text = format_int_base10(time_remaining_parts.Hours, 2) .. "H:" .. format_int_base10(time_remaining_parts.Minutes, 2) .. "M:" .. format_int_base10(time_remaining_parts.Seconds, 2) .. "S"
-
-            -- render the timer text with a gray drop shadow
-            print(timer_text, text_pos_x + 1, text_pos_y + 1, Colors.DarkGray)
-            print(timer_text, text_pos_x, text_pos_y, text_color)
         end
+
+        local should_shake = should_shake_time(current_tick_count)
+        if should_shake and (not self.shaking) then
+            self.on_shake()
+        end
+        self.shaking = should_shake
+    end
+
+    local draw_timer = function(current_tick_count)
+        -- render the timer
+        if hide_timer_for_blink() then
+            return
+        end
+
+        local text_color = Colors.White
+        local text_pos_x = self.pos_x
+        local text_pos_y = self.pos_y
+        -- TODO:if self.shaking and (blink_state == nil) then
+        if self.shaking then
+            text_color = Colors.Yellow
+            -- add shake to timer
+            text_pos_x += rnd_incrange(-1, 1)
+            text_pos_y += rnd_incrange(-1, 1)
+        end
+
+        local time_elapsed_ratio = get_timer_completion_ratio(current_tick_count)
+        local ingame_total_minutes = (24 * 60)
+        local time_remaining_minutes = (1 - time_elapsed_ratio) * ingame_total_minutes
+        local time_remaining_parts = generate_timestamp(time_remaining_minutes)
+
+        local timer_text = format_int_base10(time_remaining_parts.Hours, 2) .. "H:" .. format_int_base10(time_remaining_parts.Minutes, 2) .. "M:" .. format_int_base10(time_remaining_parts.Seconds, 2) .. "S"
+
+        -- render the timer text with a gray drop shadow
+        print(timer_text, text_pos_x + 1, text_pos_y + 1, Colors.DarkGray)
+        print(timer_text, text_pos_x, text_pos_y, text_color)
+    end
+
+    local move_timer = function(x, y)
+        self.pos_x += x
+        self.pos_y += y
     end
 
     return {
+        set_blinking = set_blinking,
         update = update_timer,
         draw = draw_timer,
+        move = move_timer,
     }
 end
