@@ -1,3 +1,3 @@
-# collards.p8
+# Dig Deep
 
-Our (yet-to-be-titled) pico-8 game for the "Classic Collards" Game Jam
+A Pico-8 game for the ["Classic Collards" Game Jam](https://itch.io/jam/culture-bytes-classic-collards-jam)
