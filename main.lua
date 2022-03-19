@@ -7,11 +7,12 @@ TileType = {
     Trap = 4,
     Fall = 5,
     BombItem = 6,
+    PageItem = 7,
 }
 
 ItemType = {
     Bomb = 1,
-    NoteFrag = 2,
+    Page = 2,
 }
 
 HintArrow = {
@@ -35,7 +36,7 @@ function ISO_TILE_HEIGHT()
 end
 
 function MAX_TILE_LINE()
-    return 8
+    return 10
 end
 
 function MAX_CAMERA_DISTANCE_FROM_PLAYER()
@@ -59,6 +60,7 @@ function _init()
     g_player.sprite_offset = { x = -8, y = -14 }
     g_player.collider = { radius = 3 }
     g_player.bomb_count = 0
+    g_player.page_count = 0
 
     g_camera_player_offset = { x = 0, y = 0 }
 
@@ -248,6 +250,17 @@ function interact_with_tile(tile)
         }
         -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
         tile.type = TileType.Empty
+    elseif tile.type == TileType.PageItem then
+        g_player.page_count += 1
+        g_player.collect_item_state = {
+            anim = g_anims.CollectItem,
+            item = ItemType.Page,
+            page_frag = tile.page_frag,
+            anim_timer = make_ingame_timer(30),
+        }
+        -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
+        tile.type = TileType.Empty
+        tile.page_frag = nil
     end
 end
 
@@ -337,6 +350,8 @@ function _draw()
                 -- N.B. this basically only happens if you use a bomb to reveal another bomb.
                 elseif isocell.tile.type == TileType.BombItem then
                     draw_bomb_item(isocell.pos)
+                elseif isocell.tile.type == TileType.PageItem then
+                    draw_page_item(isocell.pos, isocell.tile.page_frag)
                 end
             end
         end
@@ -358,6 +373,8 @@ function _draw()
         local item_pos = add_vec2(g_player.pos, { x = 0, y = -16 })
         if g_player.collect_item_state.item == ItemType.Bomb then
             draw_bomb_item(item_pos)
+        elseif g_player.collect_item_state.item == ItemType.Page then
+            draw_page_item(item_pos, g_player.collect_item_state.page_frag)
         end
     end
 
@@ -477,6 +494,10 @@ function draw_bomb_item(pos_center)
     spr_centered(74, pos_center.x, pos_center.y, 1, 1)
 end
 
+function draw_page_item(pos_center, sprite)
+    spr_centered(sprite, pos_center.x, pos_center.y, 1, 1)
+end
+
 function spr_centered(frame, x, y, tile_width, tile_height, flip_x, flip_y)
     flip_x = flip_x or false
     flip_y = flip_y or false
@@ -524,6 +545,18 @@ function generate_maps(num_maps)
     local bomb_cells = select_random_empty_tiles(maps, bomb_cell_cnt)
     for bomb_cell in all(bomb_cells) do
         bomb_cell.map.isocells[bomb_cell.idx].tile = make_tile(false, TileType.BombItem)
+    end
+
+    -- generate the page item cells
+    local page_fragments = { 172, 173, 188, 189 }
+    local next_page_frag_idx = 0
+
+    local page_cell_cnt = 10
+    local page_cells = select_random_empty_tiles(maps, page_cell_cnt)
+    for page_cell in all(page_cells) do
+        page_cell.map.isocells[page_cell.idx].tile = make_tile(false, TileType.PageItem)
+        page_cell.map.isocells[page_cell.idx].tile.page_frag = page_fragments[next_page_frag_idx + 1]
+        next_page_frag_idx = ((next_page_frag_idx + 1) % #page_fragments)
     end
 
     -- Place the start and end tile on each map
@@ -687,6 +720,8 @@ function get_iso_tile_sprite_frame(tile)
             --- return nil so we don't draw any sprites
             return nil
         elseif tile.type == TileType.BombItem then
+            return 160
+        elseif tile.type == TileType.PageItem then
             return 160
         else
             return nil
