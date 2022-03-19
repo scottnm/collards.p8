@@ -8,11 +8,14 @@ TileType = {
     Fall = 5,
     BombItem = 6,
     PageItem = 7,
+    Altar = 8,
+    StoneFloor = 9,
 }
 
 ItemType = {
     Bomb = 1,
     Page = 2,
+    Book = 3,
 }
 
 HintArrow = {
@@ -36,7 +39,7 @@ function ISO_TILE_HEIGHT()
 end
 
 function MAX_TILE_LINE()
-    return 10
+    return 9
 end
 
 function MAX_CAMERA_DISTANCE_FROM_PLAYER()
@@ -246,7 +249,7 @@ function interact_with_tile(tile)
         g_player.collect_item_state = {
             anim = g_anims.CollectItem,
             item = ItemType.Bomb,
-            anim_timer = make_ingame_timer(30),
+            anim_timer = make_ingame_timer(60),
         }
         -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
         tile.type = TileType.Empty
@@ -256,11 +259,19 @@ function interact_with_tile(tile)
             anim = g_anims.CollectItem,
             item = ItemType.Page,
             page_frag = tile.page_frag,
-            anim_timer = make_ingame_timer(30),
+            anim_timer = make_ingame_timer(60),
         }
         -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
         tile.type = TileType.Empty
         tile.page_frag = nil
+    elseif tile.has_book then
+        g_player.has_book = true
+        tile.has_book = false
+        g_player.collect_item_state = {
+            anim = g_anims.CollectItem,
+            item = ItemType.Book,
+            anim_timer = make_ingame_timer(60),
+        }
     end
 end
 
@@ -352,6 +363,13 @@ function _draw()
                     draw_bomb_item(isocell.pos)
                 elseif isocell.tile.type == TileType.PageItem then
                     draw_page_item(isocell.pos, isocell.tile.page_frag)
+                elseif isocell.tile.type == TileType.Altar then
+                    -- draw the altar
+                    spr_centered(88, isocell.pos.x, isocell.pos.y, 2, 1)
+                end
+
+                if isocell.tile.has_book then
+                    draw_book(isocell.pos, isocell.tile.type == TileType.Altar)
                 end
             end
         end
@@ -373,8 +391,13 @@ function _draw()
         local item_pos = add_vec2(g_player.pos, { x = 0, y = -16 })
         if g_player.collect_item_state.item == ItemType.Bomb then
             draw_bomb_item(item_pos)
+            draw_item_banner("bomb")
         elseif g_player.collect_item_state.item == ItemType.Page then
             draw_page_item(item_pos, g_player.collect_item_state.page_frag)
+            draw_item_banner("page fragment")
+        elseif g_player.collect_item_state.item == ItemType.Book then
+            draw_book(item_pos, false)
+            draw_item_banner("granddaddy's book")
         end
     end
 
@@ -402,11 +425,7 @@ function _draw()
     print("Level: "..g_map.level_id, 0, 120, Colors.White)
     if g_player_found_exit_timer != nil then
     elseif g_player.die_state != nil then
-        local bg_rect = { x = 0, y = 40, width = 128, height = 10 }
-        rectfill(bg_rect.x, bg_rect.y, bg_rect.x + bg_rect.width, bg_rect.y + bg_rect.height, Colors.Navy)
-        local text = "DIED"
-        local text_pos = center_text(bg_rect, text)
-        print(text, text_pos.x, text_pos.y, Colors.Red)
+        draw_banner("died", Colors.Red, Colors.Navy)
     end
 
     -- draw the bomb counter UI
@@ -426,7 +445,8 @@ function center_text(rect, text)
     local text_pixel_height = 6
     local text_start_x = rect.x + (rect.width/2) - (text_pixel_width/2)
     local text_start_y = rect.y + (rect.height/2) - (text_pixel_height/2)
-    return { x = text_start_x, y = text_start_y }
+    -- N.B. y + 1 to account for the extra pixel buffer below the font
+    return { x = text_start_x, y = text_start_y + 1 }
 end
 
 function dbg_display_frame_stats(pos)
@@ -498,6 +518,37 @@ function draw_page_item(pos_center, sprite)
     spr_centered(sprite, pos_center.x, pos_center.y, 1, 1)
 end
 
+function draw_book(pos_center, on_altar)
+    if on_altar then
+        -- draw the book on the altar
+        spr_centered(72, pos_center.x, pos_center.y - 4, 1, 1)
+    else
+        -- draw just the book on the floor
+        spr_centered(72, pos_center.x, pos_center.y, 1, 1)
+    end
+end
+
+function draw_item_banner(item_name)
+    draw_banner("got: "..item_name, Colors.DarkGreen, Colors.Tan)
+end
+
+function draw_banner(text, fg_color, bg_color)
+    -- Banners are drawn in screen space.
+    -- Grab the camera position from its memory mapped position so we can clear and later reset it
+    camera_x = peek2(0x5f28)
+    camera_y = peek2(0x5f2a)
+    camera(0, 0)
+
+    local bg_rect = { x = 0, y = 98, width = 128, height = 10 }
+    rectfill(bg_rect.x, bg_rect.y, bg_rect.x + bg_rect.width, bg_rect.y + bg_rect.height, bg_color)
+    rect(bg_rect.x + 1, bg_rect.y + 1, bg_rect.x + bg_rect.width - 2, bg_rect.y + bg_rect.height - 1, fg_color)
+    local text_pos = center_text(bg_rect, text)
+    print(text, text_pos.x, text_pos.y, fg_color)
+
+    -- restore the camera
+    camera(camera_x, camera_y)
+end
+
 function spr_centered(frame, x, y, tile_width, tile_height, flip_x, flip_y)
     flip_x = flip_x or false
     flip_y = flip_y or false
@@ -522,11 +573,23 @@ end
 function generate_maps(num_maps)
     local maps = {}
 
-    for i=1,10 do
+    for i=1,(num_maps - 1) do
         -- the first level has map size 2
         -- the largest map is size MAX_TILE_LINE()
         local map_size_for_level = min((i + 1), MAX_TILE_LINE())
         add(maps, generate_empty_level(i, map_size_for_level))
+    end
+
+    -- Place the start and end tile on each map FIRST (we have to have these tiles. The rest aren't guaranteed to be
+    -- present on every layer)
+    for map in all(maps) do
+        -- set the start cell on this map.
+        map.player_start_iso_idx = select_random_empty_tile_idx_from_map(map)
+        map.isocells[map.player_start_iso_idx].tile = make_tile(true, TileType.Start)
+
+        -- set the finish cell on this map.
+        map.finish_cell_idx = select_random_empty_tile_idx_from_map(map)
+        map.isocells[map.finish_cell_idx].tile = make_tile(false, TileType.Finish)
     end
 
     -- generate the trap cells in each map
@@ -559,18 +622,7 @@ function generate_maps(num_maps)
         next_page_frag_idx = ((next_page_frag_idx + 1) % #page_fragments)
     end
 
-    -- Place the start and end tile on each map
-    for map in all(maps) do
-        -- set the start cell on this map.
-        map.player_start_iso_idx = select_random_empty_tile_idx_from_map(map)
-        map.isocells[map.player_start_iso_idx].tile = make_tile(true, TileType.Start)
-
-        -- set the finish cell on this map.
-        map.finish_cell_idx = select_random_empty_tile_idx_from_map(map)
-        map.isocells[map.finish_cell_idx].tile = make_tile(false, TileType.Finish)
-    end
-
-    -- Lastly, now that all interesting cells have been placed, fill in the remaining empty
+    -- Now that all interesting cells have been placed, fill in the remaining empty
     -- cells with hint arrows
     for map in all(maps) do
         local iso_finish_cell_pos = map.isocells[map.finish_cell_idx].pos
@@ -605,6 +657,25 @@ function generate_maps(num_maps)
             end
         end
     end
+
+    -- Last but not least, we'll generate the last level. This
+    -- level is generated specially since it doesn't follow the rules of the previous maps.
+    -- It's just the single goal item in the middle of an empty layer
+    local final_map = generate_empty_level(num_maps, MAX_TILE_LINE())
+    -- set the final level's entry
+    final_map.player_start_iso_idx = select_random_empty_tile_idx_from_map(final_map)
+    final_map.isocells[final_map.player_start_iso_idx].tile = make_tile(true, TileType.Start)
+    -- set the altar point
+    local altar_cell_idx = select_random_empty_tile_idx_from_map(final_map)
+    final_map.isocells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
+    final_map.isocells[altar_cell_idx].tile.has_book = true
+    -- turn every other cell into a stone floor cell
+    for cell in all(final_map.isocells) do
+        if cell.tile.type == TileType.Empty then
+            cell.tile = make_tile(true, TileType.StoneFloor)
+        end
+    end
+    add(maps, final_map)
 
     -- uncomment this to make all tiles visible at start
     -- for map in all(maps) do
@@ -723,10 +794,17 @@ function get_iso_tile_sprite_frame(tile)
             return 160
         elseif tile.type == TileType.PageItem then
             return 160
+        elseif tile.type == TileType.Altar then
+            return 140
+        elseif tile.type == TileType.StoneFloor then
+            return 136
         else
             return nil
         end
     else
+        -- these two tile types should never be covered
+        assert(tile.type != TileType.Altar)
+        assert(tile.type != TileType.StoneFloor)
         return 96
     end
 end
@@ -1099,3 +1177,20 @@ end
 function scale_vec2(v, s)
     return { x = v.x * s, y = v.y * s }
 end
+
+-- TODO: keep track of things I still need to do so I don't forget
+-- let player only go back up stairs after they've collected the altar item
+-- let player only go back up very first set of stairs after they're holding the altar item
+-- let player lose game once timer reaches zero
+-- boulders falling after collecting items?
+-- render the altar on the last layer
+-- render the flower bed on the last layer
+-- render the altar item on the last layer
+-- render the stone floor on the last layer
+-- show final screen
+--         support TOTAL LOSE final screen (with hint about collected pages)
+--         support EMPTY WIN final screen (with hint about collected pages)
+--         support TOTAL WIN final screen (with final fully pieced together
+--         pages graphic)
+-- title screen
+-- SUPPOERT ITEMTYPE.BOOK in ALL PLACES IN CODE WHERE ITEMTYPE.PAGE/BOMB
