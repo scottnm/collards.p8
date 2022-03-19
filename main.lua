@@ -4,12 +4,13 @@ GameStateType = {
     PreGame = 1,
     MainGame = 2,
     LoseGame = 3,
+    WinGame = 4,
 }
 
 TileType = {
     Empty = 1,
-    Start = 2,
-    Finish = 3,
+    FloorEntry = 2,
+    FloorExit = 3,
     Trap = 4,
     Fall = 5,
     BombItem = 6,
@@ -35,6 +36,12 @@ HintArrow = {
     UpLeft = 8,
 }
 
+PlayerBookState = {
+    NotFound = 1,
+    FoundButLost = 2,
+    Holding = 3,
+}
+
 -- constants
 function ISO_TILE_WIDTH()
     return 32
@@ -52,18 +59,24 @@ function MAX_CAMERA_DISTANCE_FROM_PLAYER()
     return 20
 end
 
+function TOTAL_PAGE_COUNT()
+    return 10
+end
+
 -- global variables
 g_maps = nil
 g_map = nil
 g_player = nil
 g_input = nil
-g_player_found_exit_timer = nil
+g_player_move_to_floor_state = nil
 g_game_state = nil
 g_game_timer_ui = nil
 g_anims = nil
 g_camera_player_offset = nil
 g_bombs = nil
 g_lose_game_state = nil
+g_win_game_state = nil
+g_warning_banner = nil
 
 g_maingame_tick_count = 0
 g_maingame_time_limit = (5 * 60 * 30) -- five minutes worth of ticks
@@ -73,15 +86,17 @@ function _init()
 end
 
 function reset()
+    g_warning_banner = nil
     g_maingame_tick_count = 0
     g_game_state = GameStateType.PreGame
     g_lose_game_state = nil
     g_player = {}
+    g_player.book_state = PlayerBookState.NotFound
     g_player.pos = { x = 0, y = 0 }
     g_player.sprite_offset = { x = -8, y = -14 }
     g_player.collider = { radius = 3 }
     g_player.bomb_count = 0
-    g_player.page_count = 0
+    g_player.collected_pages = {}
 
     g_camera_player_offset = { x = 0, y = 0 }
 
@@ -114,7 +129,7 @@ function reset()
 
     -- TODO: sometimes I refer to these as maps. Sometimes as levels. I should fix this. It's confusing
     g_maps = generate_maps(10)
-    move_to_level(1)
+    move_to_level(1, TileType.FloorEntry)
 end
 
 function _update()
@@ -127,6 +142,8 @@ function _update()
         pre_game_update(g_input)
     elseif g_game_state == GameStateType.LoseGame then
         lose_game_update(g_input)
+    elseif g_game_state == GameStateType.WinGame then
+        win_game_update(g_input)
     end
 end
 
@@ -181,11 +198,13 @@ function main_game_update(input)
             g_player.collect_item_state = nil
         end
         block_input = true
-    elseif g_player_found_exit_timer != nil then
-        g_player_found_exit_timer.update()
-        if g_player_found_exit_timer.done() then
-            g_player_found_exit_timer = nil
-            move_to_level(g_map.level_id + 1)
+    elseif g_player_move_to_floor_state != nil then
+        g_player_move_to_floor_state.timer.update()
+        if g_player_move_to_floor_state.timer.done() then
+            local next_level = g_player_move_to_floor_state.next_level
+            local next_start_tile = g_player_move_to_floor_state.start_tile
+            g_player_move_to_floor_state = nil
+            move_to_level(next_level, next_start_tile)
         end
         block_input = true
     elseif g_player.die_state != nil then
@@ -193,7 +212,7 @@ function main_game_update(input)
         g_player.die_state.respawn_timer.update()
         if g_player.die_state.respawn_timer.done() then
             g_player.die_state = nil
-            move_to_level(1)
+            move_to_level(1, TileType.FloorEntry)
         end
         block_input = true
     end
@@ -220,7 +239,7 @@ function main_game_update(input)
 
             -- check for player-explosion collisions if the player isn't already dead
             if (g_player.die_state) == nil and (circ_colliders_overlap(g_player, e)) then
-                kill_player(g_player)
+                kill_player(g_player, g_map)
             end
         end
     end
@@ -257,7 +276,7 @@ function handle_new_input(input)
 
     local player_iso_tile_idx = get_actor_iso_tile_idx(g_map, g_player)
     if player_iso_tile_idx != nil then
-        local player_iso_tile = g_map.isocells[player_iso_tile_idx].tile
+        local player_iso_cell = g_map.isocells[player_iso_tile_idx]
 
         -- If we've just dug up a tile, we'll set a callback so that after
         -- the digging animation reveals the tile, we'll automatically
@@ -265,15 +284,26 @@ function handle_new_input(input)
         if is_digging then
             local reveal_tile_callback = function()
                 sfx(Sfxs.Dig)
-                player_iso_tile.visible = true
-                interact_with_tile(player_iso_tile)
+                player_iso_cell.tile.visible = true
+                interact_with_tile(player_iso_cell.tile)
             end
             g_player.dig_state.on_dig_up = reveal_tile_callback
-        -- If we aren't digging and the tile is already flipped,
-        -- we'll proactively interact with it.
-        elseif player_iso_tile.visible then
-            interact_with_tile(player_iso_tile)
+        elseif player_iso_cell.tile.visible then
+            interact_with_tile(player_iso_cell.tile)
+            g_player.last_interacted_isocell = player_iso_cell
+        elseif player_iso_cell.tile.has_book then
+            -- HACK: special case to support picking up books from unrevealed tiles
+            g_player.book_state = PlayerBookState.Holding
+            player_iso_cell.tile.has_book = false
+            g_player.collect_item_state = {
+                anim = g_anims.CollectItem,
+                item = ItemType.Book,
+                anim_timer = make_ingame_timer(60),
+            }
+            g_player.last_interacted_isocell = player_iso_cell
         end
+
+        g_player.last_visited_isocell = player_iso_cell
     end
 
     -- Handle placing new bombs
@@ -287,19 +317,77 @@ function handle_new_input(input)
 
 end
 
-function kill_player(player)
+function kill_player(player, map)
+    local had_book = false
+    if player.book_state == PlayerBookState.Holding then
+        -- drop the book in a random safe cell
+        local safe_tile_idx = select_random_empty_tile_idx_from_map(map)
+        map.isocells[safe_tile_idx].tile.has_book = true
+        g_player.book_state = PlayerBookState.FoundButLost
+        had_book = true
+    end
     player.die_state = {
         anim = get_die_anim_for_player(player),
-        respawn_timer = make_ingame_timer(60)
+        respawn_timer = make_ingame_timer(60),
+        had_book = had_book,
     }
     sfx(Sfxs.Death)
 end
 
 function interact_with_tile(tile)
-    if tile.type == TileType.Finish then
-        g_player_found_exit_timer = make_ingame_timer(15)
+    -- only interact with a tile the first time you step on it.
+    if tile == g_player.last_interacted_isocell.tile then
+        return
+    end
+
+    if tile.type == TileType.FloorExit then
+        g_player_move_to_floor_state = {
+            timer = make_ingame_timer(15),
+            next_level = g_map.level_id + 1,
+            start_tile = TileType.FloorEntry,
+        }
+    elseif tile.type == TileType.FloorEntry then
+        -- if we haven't found the book and we try to leave, warn the player
+        if g_player.book_state == PlayerBookState.NotFound then
+            g_warning_banner = {
+                timer = make_ingame_timer(90),
+                text = "Can't leave until I find it."
+            }
+        elseif g_player.book_state == PlayerBookState.FoundButLost then
+            -- if we've found the book but lost it we can freely traverse all floors... EXCEPT we can't leave
+            if g_map.level_id != 1 then
+                g_player_move_to_floor_state = {
+                    timer = make_ingame_timer(15),
+                    next_level = g_map.level_id - 1,
+                    start_tile = TileType.FloorExit,
+                }
+            else
+                g_warning_banner = {
+                    timer = make_ingame_timer(90),
+                    text = "Can't leave. I dropped the book."
+                }
+            end
+        elseif g_player.book_state == PlayerBookState.Holding then
+            -- we have the book. we can traverse up any floor AND win the game by leaving the last floor
+            if g_map.level_id != 1 then
+                g_player_move_to_floor_state = {
+                    timer = make_ingame_timer(15),
+                    next_level = g_map.level_id - 1,
+                    start_tile = TileType.FloorExit,
+                }
+            else
+                g_win_game_state = {
+                    substate = "scroll_timer",
+                    timer_scroll = 0,
+                }
+                g_game_timer_ui.set_blinking(true)
+                g_game_state = GameStateType.WinGame
+            end
+        else
+            assert(false)
+        end
     elseif tile.type == TileType.Trap then
-        kill_player(g_player)
+        kill_player(g_player, g_map)
     elseif tile.type == TileType.BombItem then
         g_player.bomb_count += 1
         g_player.collect_item_state = {
@@ -310,7 +398,7 @@ function interact_with_tile(tile)
         -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
         tile.type = TileType.Empty
     elseif tile.type == TileType.PageItem then
-        g_player.page_count += 1
+        add(g_player.collected_pages, tile.page_frag)
         g_player.collect_item_state = {
             anim = g_anims.CollectItem,
             item = ItemType.Page,
@@ -321,7 +409,7 @@ function interact_with_tile(tile)
         tile.type = TileType.Empty
         tile.page_frag = nil
     elseif tile.has_book then
-        g_player.has_book = true
+        g_player.book_state = PlayerBookState.Holding
         tile.has_book = false
         g_player.collect_item_state = {
             anim = g_anims.CollectItem,
@@ -415,12 +503,39 @@ function lose_game_update(input)
     end
 end
 
+function win_game_update(input)
+    g_game_timer_ui.update(g_maingame_tick_count)
+
+    if g_win_game_state.substate == "scroll_timer" then
+        g_win_game_state.timer_scroll += 1
+        g_game_timer_ui.move(0, 0.5)
+        if g_win_game_state.timer_scroll == 120 then
+            g_win_game_state.substate = "brief_blink"
+            g_win_game_state.final_blink = make_ingame_timer(120)
+        end
+    elseif g_win_game_state.substate == "brief_blink" then
+        g_win_game_state.final_blink.update()
+        if g_win_game_state.final_blink.done() then
+            g_win_game_state.substate = "display_win_text"
+            g_win_game_state.win_text_roll_timer = make_ingame_timer(240)
+            g_win_game_state.win_text = generate_win_text(#g_player.collected_pages, TOTAL_PAGE_COUNT())
+        end
+    elseif g_win_game_state.substate == "display_win_text" then
+        g_win_game_state.win_text_roll_timer.update()
+        if g_win_game_state.win_text_roll_timer.done() and (input.btn_x or input.btn_o) then
+            reset()
+        end
+    end
+end
+
 function _draw()
     if g_game_state == GameStateType.MainGame or
        g_game_state == GameStateType.PreGame then
        draw_game()
     elseif g_game_state == GameStateType.LoseGame then
         draw_lose_game()
+    elseif g_game_state == GameStateType.WinGame then
+        draw_win_game()
     end
 end
 
@@ -457,17 +572,17 @@ function draw_game()
                     -- draw the altar
                     spr_centered(88, isocell.pos.x, isocell.pos.y, 2, 1)
                 end
+            end
 
-                if isocell.tile.has_book then
-                    draw_book(isocell.pos, isocell.tile.type == TileType.Altar)
-                end
+            if isocell.tile.has_book then
+                draw_book(isocell.pos, isocell.tile.type == TileType.Altar)
             end
         end
     end
 
-    local player_iso_tile_idx = get_actor_iso_tile_idx(g_map, g_player)
-    if player_iso_tile_idx != nil then
-        highlight_player_iso_tile(g_map, player_iso_tile_idx)
+    -- if the player is standing on their last visited isotile, highlight it
+    if circ_colliders_overlap(g_player, g_player.last_visited_isocell) then
+        highlight_iso_cell(g_player.last_visited_isocell)
     end
 
     --
@@ -513,14 +628,32 @@ function draw_game()
 
     -- draw the level UI
     print("Level: "..g_map.level_id, 0, 120, Colors.White)
-    if g_player_found_exit_timer != nil then
+    if g_player_move_to_floor_state != nil then
+        -- noop? I'm not sure why I added this before and am not sure if it's
+        -- necessary. Keep it around to avoid mucking with the game this late
+        -- in the jam.
     elseif g_player.die_state != nil then
-        draw_banner("died", Colors.Red, Colors.Navy)
+        local died_text = "died."
+        if g_player.die_state.had_book then
+            died_text = died_text.." dropped book."
+        end
+        draw_banner(died_text, Colors.Red, Colors.Navy)
+    end
+
+    if g_warning_banner != nil then
+        draw_banner(g_warning_banner.text, Colors.Tan, Colors.BlueGray)
+        g_warning_banner.timer.update()
+        if g_warning_banner.timer.done() then
+            g_warning_banner = nil
+        end
     end
 
     -- draw the bomb counter UI
     draw_bomb_item({ x = 4, y = 111 })
     print(":"..g_player.bomb_count, 8, 110, Colors.White)
+
+    -- draw the page UI
+    draw_page_ui(g_player)
 
     -- draw the in-game timer UI
     g_game_timer_ui.draw(g_maingame_tick_count)
@@ -541,6 +674,9 @@ function draw_lose_game()
         local player_sprite_pos = sprite_pos(g_player)
         draw_anim(g_player, player_sprite_pos)
 
+        -- draw the page UI
+        draw_page_ui(g_player)
+
         -- reset the camera to 0 keep the UI fixed on screen
         camera(0, 0)
 
@@ -554,7 +690,62 @@ function draw_lose_game()
         local end_char = flr((#g_lose_game_state.lose_text) * rolled_text_ratio)
         local lose_text = sub(g_lose_game_state.lose_text, 1, end_char)
         print(lose_text, 10, 10, Colors.White)
+
+        -- draw the page UI
+        draw_page_ui(g_player)
     end
+end
+
+function draw_win_game()
+    cls(Colors.BLACK)
+
+    if g_win_game_state.substate != "display_win_text" then
+        -- Set the camera view so that the world is draw relative to its position
+        camera_follow_player(g_player, g_camera_player_offset)
+        camera(g_camera_player_offset.x, g_camera_player_offset.y);
+
+        -- draw the player frozen at the win state
+        local player_sprite_pos = sprite_pos(g_player)
+        draw_anim(g_player, player_sprite_pos)
+
+        -- draw the page UI
+        draw_page_ui(g_player)
+
+        -- reset the camera to 0 keep the UI fixed on screen
+        camera(0, 0)
+
+        -- draw the level UI
+        print("Level: "..g_map.level_id, 0, 120, Colors.White)
+
+        -- draw the in-game timer UI
+        g_game_timer_ui.draw(g_maingame_tick_count)
+    else
+        local rolled_text_ratio = g_win_game_state.win_text_roll_timer.get_elapsed_ratio()
+        local end_char = flr((#g_win_game_state.win_text) * rolled_text_ratio)
+        local win_text = sub(g_win_game_state.win_text, 1, end_char)
+        print(win_text, 10, 10, Colors.White)
+
+        -- draw the page UI
+        draw_page_ui(g_player)
+    end
+end
+
+function draw_page_ui(player)
+    -- Page UI is drawn in screnspace. Temporarily reset the camera.
+    camera_x = peek2(0x5f28)
+    camera_y = peek2(0x5f2a)
+    camera(0, 0)
+
+    local tile_px_width = 8
+    local tile_px_height = 8
+    for i=1,#g_player.collected_pages do
+        local x = 128 - (i*tile_px_width)
+        local y = 120
+        draw_page_item({x=x, y=y}, g_player.collected_pages[i])
+    end
+
+    -- restore the camera
+    camera(camera_x, camera_y)
 end
 
 function center_text(rect, text)
@@ -702,12 +893,12 @@ function generate_maps(num_maps)
     -- present on every layer)
     for map in all(maps) do
         -- set the start cell on this map.
-        map.player_start_iso_idx = select_random_empty_tile_idx_from_map(map)
-        map.isocells[map.player_start_iso_idx].tile = make_tile(true, TileType.Start)
+        local player_start_iso_idx = select_random_empty_tile_idx_from_map(map)
+        map.isocells[player_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
 
         -- set the finish cell on this map.
         map.finish_cell_idx = select_random_empty_tile_idx_from_map(map)
-        map.isocells[map.finish_cell_idx].tile = make_tile(false, TileType.Finish)
+        map.isocells[map.finish_cell_idx].tile = make_tile(false, TileType.FloorExit)
     end
 
     -- generate the trap cells in each map
@@ -732,7 +923,7 @@ function generate_maps(num_maps)
     local page_fragments = { 172, 173, 188, 189 }
     local next_page_frag_idx = 0
 
-    local page_cell_cnt = 10
+    local page_cell_cnt = TOTAL_PAGE_COUNT()
     local page_cells = select_random_empty_tiles(maps, page_cell_cnt)
     for page_cell in all(page_cells) do
         page_cell.map.isocells[page_cell.idx].tile = make_tile(false, TileType.PageItem)
@@ -781,8 +972,8 @@ function generate_maps(num_maps)
     -- It's just the single goal item in the middle of an empty layer
     local final_map = generate_empty_level(num_maps, MAX_TILE_LINE())
     -- set the final level's entry
-    final_map.player_start_iso_idx = select_random_empty_tile_idx_from_map(final_map)
-    final_map.isocells[final_map.player_start_iso_idx].tile = make_tile(true, TileType.Start)
+    local final_map_start_iso_idx = select_random_empty_tile_idx_from_map(final_map)
+    final_map.isocells[final_map_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
     -- set the altar point
     local altar_cell_idx = select_random_empty_tile_idx_from_map(final_map)
     final_map.isocells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
@@ -799,6 +990,17 @@ function generate_maps(num_maps)
     -- for map in all(maps) do
     --     for cell in all(map.isocells) do
     --         cell.tile.visible = true
+    --     end
+    -- end
+
+    -- uncomment this to make all exit tiles and page tiles visible at start
+    -- for map in all(maps) do
+    --     for cell in all(map.isocells) do
+    --         if cell.tile.type == TileType.PageItem then
+    --             cell.tile.visible = true
+    --         elseif cell.tile.type == TileType.FloorExit then
+    --             cell.tile.visible = true
+    --         end
     --     end
     -- end
 
@@ -899,9 +1101,9 @@ function get_iso_tile_sprite_frame(tile)
     if tile.visible then
         if tile.type == TileType.Empty then
             return 160
-        elseif tile.type == TileType.Start then
+        elseif tile.type == TileType.FloorEntry then
             return 108
-        elseif tile.type == TileType.Finish then
+        elseif tile.type == TileType.FloorExit then
             return 104
         elseif tile.type == TileType.Trap then
             return 76
@@ -927,12 +1129,23 @@ function get_iso_tile_sprite_frame(tile)
     end
 end
 
-function move_to_level(next_level)
+function move_to_level(next_level, start_tile_type)
     -- update the current map
     g_map = g_maps[next_level]
 
     -- place the player on the center of the iso tile
-    g_player.pos = copy_vec2(g_map.isocells[g_map.player_start_iso_idx].pos)
+    local player_start_cell = nil
+    for cell in all(g_map.isocells) do
+        if cell.tile.type == start_tile_type then
+            player_start_cell = cell
+            break
+        end
+    end
+    assert(player_start_cell != nil)
+    g_player.pos = copy_vec2(player_start_cell.pos)
+    g_player.last_visited_isocell = player_start_cell
+    g_player.last_interacted_isocell = player_start_cell
+
     -- place the camera on top of the player
     g_camera_player_offset = get_centered_camera_on_player(g_player)
 
@@ -980,7 +1193,7 @@ function move_player(input)
         return
     end
 
-    local player_speed = 0.7 -- an arbitrary, tweakable speed factor to hand tune movement speed to feel good
+    local player_speed = 1.0 -- an arbitrary, tweakable speed factor to hand tune movement speed to feel good
     movement_x *= player_speed
     movement_y *= player_speed
 
@@ -1148,15 +1361,16 @@ function rect_colliders_overlap(c1, c2)
     return true
 end
 
-function highlight_player_iso_tile(map, player_tile_idx)
-    local tile_pos = map.isocells[player_tile_idx].pos
+function highlight_iso_cell(cell)
+    local cell_pos_x = cell.pos.x
+    local cell_pos_y = cell.pos.y
     -- N.B. for some reason, I need to subtract '1' from each of the y values. I haven't yet rationalized why
     -- the off-by-one pixel shift is needed. I'll figure it out later.
     local line_points = {
-        { x = tile_pos.x - ISO_TILE_WIDTH()/2, y = tile_pos.y - 1 },
-        { x = tile_pos.x,                      y = tile_pos.y - 1 - ISO_TILE_HEIGHT()/2 },
-        { x = tile_pos.x + ISO_TILE_WIDTH()/2, y = tile_pos.y - 1},
-        { x = tile_pos.x,                      y = tile_pos.y - 1+ ISO_TILE_HEIGHT()/2 },
+        { x = cell_pos_x - ISO_TILE_WIDTH()/2, y = cell_pos_y - 1 },
+        { x = cell_pos_x,                      y = cell_pos_y - 1 - ISO_TILE_HEIGHT()/2 },
+        { x = cell_pos_x + ISO_TILE_WIDTH()/2, y = cell_pos_y - 1},
+        { x = cell_pos_x,                      y = cell_pos_y - 1+ ISO_TILE_HEIGHT()/2 },
     }
 
     line(line_points[1].x, line_points[1].y, line_points[2].x, line_points[2].y, Colors.White)
@@ -1276,6 +1490,72 @@ function new_bomb(pos)
     }
 end
 
+function split_text(text)
+    local split_text = ""
+    local chars_processed = 0
+    while chars_processed < #text do
+        local end_char = min(chars_processed + 1 + 25, #text)
+        local next_chunk = nil
+
+        if end_char == #text then
+            next_chunk = sub(text, chars_processed + 1)
+        else
+            local new_line_idx = nil
+            for i=(chars_processed+1),end_char do
+                if sub(text, i, i) == "\n" then
+                    new_line_idx = i
+                end
+            end
+
+            if new_line_idx != nil then
+                -- if there's a new line. process up to but not including that newline char
+                -- include an extra space at the end of this chunk so that we skip past the
+                -- newline when updating chars_processed
+                next_chunk = sub(text, chars_processed + 1, new_line_idx - 1).." "
+            else
+                while sub(text, end_char, end_char) != " " do
+                    end_char -= 1
+                end
+                next_chunk = sub(text, chars_processed + 1, end_char)
+            end
+        end
+
+        if split_text == "" then
+            split_text = next_chunk
+        else
+            split_text = split_text.."\n"..next_chunk
+        end
+        chars_processed += #next_chunk
+    end
+    return split_text
+end
+
+function generate_win_text(collected_page_count, total_page_count)
+    local text = "you made it back with the book, a brown book stitched together with strong thread and thick brown pages, a family heirloom."
+    if collected_page_count == 0 then
+        text = text .. " opening the book you realize several pages are missing. maybe they're back down in the cavern, but there isn't time to check. i guess there's some comfort knowing you have the book at all. in another life, maybe you could find those pages.\n\nx/c - to reset"
+    elseif collected_page_count < total_page_count then
+        local page_plural = nil
+        if collected_page_count == 1 then
+            page_plural = "page"
+        else
+            page_plural = "pages"
+        end
+
+        local gap_plural = nil
+        if collected_page_count == (total_page_count - 1) then
+            gap_plural = "is still 1 page missing. maybe the last page is"
+        else
+            gap_plural = "are still "..(total_page_count-collected_page_count).." pages missing. maybe the rest are"
+        end
+
+        text = text .. " setting the "..collected_page_count.." recovered "..page_plural.." in the book you realize there "..gap_plural.." back down in the cavern. there's no time to check. it's not whole, but there's comfort in what you have. in another life, maybe we could recover the rest.\n\nx/c - to reset"
+    else
+        text = text .. " setting all "..total_page_count.." pages you found below in the book you realize the book is complete.\n\nx/c - to reset"
+    end
+    return split_text(text)
+end
+
 function isomap_row_cnt(map)
     return map.iso_width * 2 - 1
 end
@@ -1297,20 +1577,7 @@ function scale_vec2(v, s)
 end
 
 -- TODO: keep track of things I still need to do so I don't forget
--- let player only go back up stairs after they've collected the altar item
--- let player only go back up very first set of stairs after they're holding the altar item
--- let player lose game once timer reaches zero
 -- boulders falling after collecting items?
--- render the altar on the last layer
--- render the flower bed on the last layer
--- render the altar item on the last layer
--- render the stone floor on the last layer
--- show final screen
---         support TOTAL LOSE final screen (with hint about collected pages)
---         support EMPTY WIN final screen (with hint about collected pages)
---         support TOTAL WIN final screen (with final fully pieced together
---         pages graphic)
 -- title screen
--- SUPPOERT ITEMTYPE.BOOK in ALL PLACES IN CODE WHERE ITEMTYPE.PAGE/BOMB
 -- last minute ideas. a trap which disorients you
 -- last minute ideas. an item which slows down time for a bit

@@ -103,7 +103,6 @@ function make_ui_timer(on_shake, total_ticks)
         local text_color = Colors.White
         local text_pos_x = self.pos_x
         local text_pos_y = self.pos_y
-        -- TODO:if self.shaking and (blink_state == nil) then
         if self.shaking then
             text_color = Colors.Yellow
             -- add shake to timer
