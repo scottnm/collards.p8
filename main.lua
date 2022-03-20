@@ -160,6 +160,7 @@ function pre_game_update(input)
     if any_btn then
         g_game_timer_ui.set_blinking(false)
         g_game_state = GameStateType.MainGame
+        music(0, 1000, 7)
     end
 end
 
@@ -256,6 +257,7 @@ function main_game_update(input)
         }
         g_game_state = GameStateType.LoseGame
         g_game_timer_ui.set_blinking(true)
+        music(-1, 1000)
     end
 end
 
@@ -382,6 +384,7 @@ function interact_with_tile(tile)
                 }
                 g_game_timer_ui.set_blinking(true)
                 g_game_state = GameStateType.WinGame
+                music(-1, 1000)
             end
         else
             assert(false)
@@ -493,7 +496,7 @@ function lose_game_update(input)
         if g_lose_game_state.final_blink.done() then
             g_lose_game_state.substate = "display_lose_text"
             g_lose_game_state.lose_text_roll_timer = make_ingame_timer(240)
-            g_lose_game_state.lose_text = "you were unable to make\nyour way to the bottom\nof the cavern in time.\n\nyour family's most\ncherished heirloom is\nlost. gone forever.\n\nthis is unacceptable.\nwe'll have to try again.\n\nx/c - to reset"
+            g_lose_game_state.lose_text = "you were unable to make\nyour way to the bottom\nof the grave in time.\n\nyour family's most\ncherished heirloom is\nlost. gone forever.\n\nthis is unacceptable.\nwe'll have to try again.\n\nx/c - to reset"
         end
     elseif g_lose_game_state.substate == "display_lose_text" then
         g_lose_game_state.lose_text_roll_timer.update()
@@ -1533,7 +1536,7 @@ end
 function generate_win_text(collected_page_count, total_page_count)
     local text = "you made it back with the book, a brown book stitched together with strong thread and thick brown pages, a family heirloom."
     if collected_page_count == 0 then
-        text = text .. " opening the book you realize several pages are missing. maybe they're back down in the cavern, but there isn't time to check. i guess there's some comfort knowing you have the book at all. in another life, maybe you could find those pages.\n\nx/c - to reset"
+        text = text .. " opening the book you realize several pages are missing. maybe they're back down in the grave, but there isn't time to check. i guess there's some comfort knowing you have the book at all. in another life, maybe you could find those pages.\n\nx/c - to reset"
     elseif collected_page_count < total_page_count then
         local page_plural = nil
         if collected_page_count == 1 then
@@ -1549,7 +1552,7 @@ function generate_win_text(collected_page_count, total_page_count)
             gap_plural = "are still "..(total_page_count-collected_page_count).." pages missing. maybe the rest are"
         end
 
-        text = text .. " setting the "..collected_page_count.." recovered "..page_plural.." in the book you realize there "..gap_plural.." back down in the cavern. there's no time to check. it's not whole, but there's comfort in what you have. in another life, maybe we could recover the rest.\n\nx/c - to reset"
+        text = text .. " setting the "..collected_page_count.." recovered "..page_plural.." in the book you realize there "..gap_plural.." back down in the grave. there's no time to check. it's not whole, but there's comfort in what you have. in another life, maybe we could recover the rest.\n\nx/c - to reset"
     else
         text = text .. " setting all "..total_page_count.." pages you found below in the book you realize the book is complete.\n\nx/c - to reset"
     end
