@@ -1,5 +1,8 @@
 -- main.lua - main game logic
 
+-- TODO: refactor the banner system for simplicity
+-- each component just calls some queue_banner and it overwrites the current banner with a manually tracked time limit
+
 GameStateType = {
     PreGame = 1,
     MainGame = 2,
@@ -261,6 +264,30 @@ function main_game_update(input)
     end
 end
 
+function collect_item(player, item_type, item_args)
+    player.collect_item_state = {
+        anim = g_anims.CollectItem,
+        item = item_type,
+        anim_timer = make_ingame_timer(60),
+    }
+
+    item_args = item_args or {}
+    for k,v in pairs(item_args) do
+        player.collect_item_state[k] = v
+    end
+
+    sfx(Sfxs.GetItem)
+end
+
+function start_move_to_floor(next_level, start_tile_type, stair_sfx)
+    g_player_move_to_floor_state = {
+        timer = make_ingame_timer(15),
+        next_level = next_level,
+        start_tile = start_tile_type,
+    }
+    sfx(stair_sfx)
+end
+
 function handle_new_input(input)
     move_player(g_input)
     animate_player(g_input)
@@ -313,10 +340,14 @@ function handle_new_input(input)
     if try_place_bomb then
         if g_player.bomb_count > 0 then
             g_player.bomb_count -= 1
-            add(g_bombs, new_bomb(g_player.pos))
+            add(g_bombs, new_bomb(g_player.pos, on_explosion_start))
         end
     end
 
+end
+
+function on_explosion_start()
+    sfx(Sfxs.BombExplosion)
 end
 
 function kill_player(player, map)
@@ -343,11 +374,7 @@ function interact_with_tile(tile)
     end
 
     if tile.type == TileType.FloorExit then
-        g_player_move_to_floor_state = {
-            timer = make_ingame_timer(15),
-            next_level = g_map.level_id + 1,
-            start_tile = TileType.FloorEntry,
-        }
+        start_move_to_floor(g_map.level_id + 1, TileType.FloorEntry, Sfxs.UpStairs)
     elseif tile.type == TileType.FloorEntry then
         -- if we haven't found the book and we try to leave, warn the player
         if g_player.book_state == PlayerBookState.NotFound then
@@ -358,11 +385,7 @@ function interact_with_tile(tile)
         elseif g_player.book_state == PlayerBookState.FoundButLost then
             -- if we've found the book but lost it we can freely traverse all floors... EXCEPT we can't leave
             if g_map.level_id != 1 then
-                g_player_move_to_floor_state = {
-                    timer = make_ingame_timer(15),
-                    next_level = g_map.level_id - 1,
-                    start_tile = TileType.FloorExit,
-                }
+                start_move_to_floor(g_map.level_id - 1, TileType.FloorExit, Sfxs.UpStairs)
             else
                 g_warning_banner = {
                     timer = make_ingame_timer(90),
@@ -372,11 +395,7 @@ function interact_with_tile(tile)
         elseif g_player.book_state == PlayerBookState.Holding then
             -- we have the book. we can traverse up any floor AND win the game by leaving the last floor
             if g_map.level_id != 1 then
-                g_player_move_to_floor_state = {
-                    timer = make_ingame_timer(15),
-                    next_level = g_map.level_id - 1,
-                    start_tile = TileType.FloorExit,
-                }
+                start_move_to_floor(g_map.level_id - 1, TileType.FloorExit, Sfxs.UpStairs)
             else
                 g_win_game_state = {
                     substate = "scroll_timer",
@@ -393,32 +412,19 @@ function interact_with_tile(tile)
         kill_player(g_player, g_map)
     elseif tile.type == TileType.BombItem then
         g_player.bomb_count += 1
-        g_player.collect_item_state = {
-            anim = g_anims.CollectItem,
-            item = ItemType.Bomb,
-            anim_timer = make_ingame_timer(60),
-        }
+        collect_item(g_player, ItemType.Bomb)
         -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
         tile.type = TileType.Empty
     elseif tile.type == TileType.PageItem then
         add(g_player.collected_pages, tile.page_frag)
-        g_player.collect_item_state = {
-            anim = g_anims.CollectItem,
-            item = ItemType.Page,
-            page_frag = tile.page_frag,
-            anim_timer = make_ingame_timer(60),
-        }
+        collect_item(g_player, ItemType.Page, { page_frag = tile.page_frag })
         -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
         tile.type = TileType.Empty
         tile.page_frag = nil
     elseif tile.has_book then
         g_player.book_state = PlayerBookState.Holding
         tile.has_book = false
-        g_player.collect_item_state = {
-            anim = g_anims.CollectItem,
-            item = ItemType.Book,
-            anim_timer = make_ingame_timer(60),
-        }
+        collect_item(g_player, ItemType.Book)
     end
 end
 
@@ -1382,7 +1388,7 @@ function highlight_iso_cell(cell)
     line(line_points[4].x, line_points[4].y, line_points[1].x, line_points[1].y, Colors.White)
 end
 
-function new_bomb(pos)
+function new_bomb(pos, on_explosion_start)
     local self = {
         state = "Countdown",
         countdown_anim = g_anims.BombCountdown,
@@ -1390,6 +1396,7 @@ function new_bomb(pos)
         explosions = {},
         active_explosions = {},
         pos = copy_vec2(pos),
+        on_explosion_start = on_explosion_start
     }
 
     function get_center_draw_pos(pos, width, height)
@@ -1443,6 +1450,7 @@ function new_bomb(pos)
                 e.frame += 1
                 if e.frame == 1 then
                     add(self.active_explosions, e)
+                    self.on_explosion_start()
                 elseif e.frame == 13 then
                     del(self.active_explosions, e)
                 end
