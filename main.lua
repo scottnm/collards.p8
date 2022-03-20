@@ -1,8 +1,5 @@
 -- main.lua - main game logic
 
--- TODO: refactor the banner system for simplicity
--- each component just calls some queue_banner and it overwrites the current banner with a manually tracked time limit
-
 GameStateType = {
     PreGame = 1,
     MainGame = 2,
@@ -66,30 +63,17 @@ function TOTAL_PAGE_COUNT()
     return 10
 end
 
--- global variables
-g_maps = nil
-g_map = nil
-g_player = nil
-g_input = nil
-g_player_move_to_floor_state = nil
-g_game_state = nil
-g_game_timer_ui = nil
-g_anims = nil
-g_camera_player_offset = nil
-g_bombs = nil
-g_lose_game_state = nil
-g_win_game_state = nil
-g_warning_banner = nil
-
-g_maingame_tick_count = 0
-g_maingame_time_limit = (5 * 60 * 30) -- five minutes worth of ticks
+function MAINGAME_TIME_LIMIT()
+    return (5 * 60 * 30) -- five minutes worth of ticks
+end
 
 function _init()
     reset()
 end
 
 function reset()
-    g_warning_banner = nil
+    -- All global variables initialized here
+    g_banner = nil
     g_maingame_tick_count = 0
     g_game_state = GameStateType.PreGame
     g_lose_game_state = nil
@@ -127,7 +111,7 @@ function reset()
         CollectItem = create_anim_flow({46}, 1, 2, false),
         BombCountdown = create_anim_flow({74, 74, 74, 74, 74, 74, 74, 75, 74, 74, 75, 74, 74, 75, 74}, 15, 1, false),
     }
-    g_game_timer_ui = make_ui_timer(on_ui_timer_flash, g_maingame_time_limit)
+    g_game_timer_ui = make_ui_timer(on_ui_timer_flash, MAINGAME_TIME_LIMIT())
     g_game_timer_ui.set_blinking(true)
 
     -- TODO: sometimes I refer to these as maps. Sometimes as levels. I should fix this. It's confusing
@@ -253,7 +237,7 @@ function main_game_update(input)
         del(g_bombs, bomb)
     end
 
-    if g_maingame_tick_count >= g_maingame_time_limit then
+    if g_maingame_tick_count >= MAINGAME_TIME_LIMIT() then
         g_lose_game_state = {
             substate = "scroll_timer",
             timer_scroll = 0,
@@ -268,13 +252,25 @@ function collect_item(player, item_type, item_args)
     player.collect_item_state = {
         anim = g_anims.CollectItem,
         item = item_type,
-        anim_timer = make_ingame_timer(60),
+        anim_timer = make_ingame_timer(45),
     }
 
     item_args = item_args or {}
     for k,v in pairs(item_args) do
         player.collect_item_state[k] = v
     end
+
+    local item_text = nil
+    if item_type == ItemType.Bomb then
+        item_text = "bomb. \151 to use"
+    elseif item_type == ItemType.Page then
+        item_text = "page fragment"
+    elseif item_type == ItemType.Book then
+        item_text = "granddaddy's book"
+    else
+        assert(false)
+    end
+    set_banner("got: "..item_text, "item", 60)
 
     sfx(Sfxs.GetItem)
 end
@@ -324,11 +320,7 @@ function handle_new_input(input)
             -- HACK: special case to support picking up books from unrevealed tiles
             g_player.book_state = PlayerBookState.Holding
             player_iso_cell.tile.has_book = false
-            g_player.collect_item_state = {
-                anim = g_anims.CollectItem,
-                item = ItemType.Book,
-                anim_timer = make_ingame_timer(60),
-            }
+            collect_item(g_player, ItemType.Book)
             g_player.last_interacted_isocell = player_iso_cell
         end
 
@@ -351,19 +343,21 @@ function on_explosion_start()
 end
 
 function kill_player(player, map)
-    local had_book = false
+    local died_text = "died."
     if player.book_state == PlayerBookState.Holding then
         -- drop the book in a random safe cell
         local safe_tile_idx = select_random_empty_tile_idx_from_map(map)
         map.isocells[safe_tile_idx].tile.has_book = true
         g_player.book_state = PlayerBookState.FoundButLost
-        had_book = true
+        died_text = died_text.." dropped book."
     end
+
     player.die_state = {
         anim = get_die_anim_for_player(player),
         respawn_timer = make_ingame_timer(60),
-        had_book = had_book,
     }
+
+    set_banner(died_text, "death", 60)
     sfx(Sfxs.Death)
 end
 
@@ -378,19 +372,13 @@ function interact_with_tile(tile)
     elseif tile.type == TileType.FloorEntry then
         -- if we haven't found the book and we try to leave, warn the player
         if g_player.book_state == PlayerBookState.NotFound then
-            g_warning_banner = {
-                timer = make_ingame_timer(90),
-                text = "Can't leave until I find it."
-            }
+            set_banner("can't leave until i find it.", "warning", 90)
         elseif g_player.book_state == PlayerBookState.FoundButLost then
             -- if we've found the book but lost it we can freely traverse all floors... EXCEPT we can't leave
             if g_map.level_id != 1 then
                 start_move_to_floor(g_map.level_id - 1, TileType.FloorExit, Sfxs.UpStairs)
             else
-                g_warning_banner = {
-                    timer = make_ingame_timer(90),
-                    text = "Can't leave. I dropped the book."
-                }
+                set_banner("can't leave. i lost the book.", "warning", 90)
             end
         elseif g_player.book_state == PlayerBookState.Holding then
             -- we have the book. we can traverse up any floor AND win the game by leaving the last floor
@@ -605,13 +593,10 @@ function draw_game()
         local item_pos = add_vec2(g_player.pos, { x = 0, y = -16 })
         if g_player.collect_item_state.item == ItemType.Bomb then
             draw_bomb_item(item_pos)
-            draw_item_banner("bomb")
         elseif g_player.collect_item_state.item == ItemType.Page then
             draw_page_item(item_pos, g_player.collect_item_state.page_frag)
-            draw_item_banner("page fragment")
         elseif g_player.collect_item_state.item == ItemType.Book then
             draw_book(item_pos, false)
-            draw_item_banner("granddaddy's book")
         end
     end
 
@@ -637,23 +622,13 @@ function draw_game()
 
     -- draw the level UI
     print("Level: "..g_map.level_id, 0, 120, Colors.White)
-    if g_player_move_to_floor_state != nil then
-        -- noop? I'm not sure why I added this before and am not sure if it's
-        -- necessary. Keep it around to avoid mucking with the game this late
-        -- in the jam.
-    elseif g_player.die_state != nil then
-        local died_text = "died."
-        if g_player.die_state.had_book then
-            died_text = died_text.." dropped book."
-        end
-        draw_banner(died_text, Colors.Red, Colors.Navy)
-    end
 
-    if g_warning_banner != nil then
-        draw_banner(g_warning_banner.text, Colors.Tan, Colors.BlueGray)
-        g_warning_banner.timer.update()
-        if g_warning_banner.timer.done() then
-            g_warning_banner = nil
+    -- draw any banners if set
+    if g_banner != nil then
+        draw_banner(g_banner.text, g_banner.fg_color, g_banner.bg_color)
+        g_banner.timer.update()
+        if g_banner.timer.done() then
+            g_banner = nil
         end
     end
 
@@ -846,8 +821,22 @@ function draw_book(pos_center, on_altar)
     end
 end
 
-function draw_item_banner(item_name)
-    draw_banner("got: "..item_name, Colors.DarkGreen, Colors.Tan)
+function set_banner(text, banner_type, banner_time)
+    local fg_color, bg_color = nil, nil
+    if banner_type == "warning" then
+        fg_color, bg_color = Colors.Tan, Colors.BlueGray
+    elseif banner_type == "item" then
+        fg_color, bg_color = Colors.DarkGreen, Colors.Tan
+    elseif banner_type == "death" then
+        fg_color, bg_color = Colors.Red, Colors.Navy
+    end
+
+    g_banner = {
+        text = text,
+        fg_color = fg_color,
+        bg_color = bg_color,
+        timer = make_ingame_timer(banner_time),
+    }
 end
 
 function draw_banner(text, fg_color, bg_color)
