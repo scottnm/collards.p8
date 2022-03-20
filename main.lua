@@ -1529,9 +1529,3 @@ function handle_game_over(game_won)
     g_game_phase = GamePhase.GameOver
     music(-1, 1000)
 end
-
--- TODO: keep track of things I still need to do so I don't forget
--- boulders falling after collecting items?
--- title screen
--- last minute ideas. a trap which disorients you
--- last minute ideas. an item which slows down time for a bit
