@@ -1,6 +1,6 @@
 -- main.lua - main game logic
 
-GameStateType = {
+GamePhase = {
     PreGame = 1,
     MainGame = 2,
     LoseGame = 3,
@@ -75,7 +75,7 @@ function reset()
     -- All global variables initialized here
     g_banner = nil
     g_maingame_tick_count = 0
-    g_game_state = GameStateType.PreGame
+    g_game_phase = GamePhase.PreGame
     g_lose_game_state = nil
     g_player = {}
     g_player.book_state = PlayerBookState.NotFound
@@ -123,13 +123,13 @@ function _update()
     -- get input
     g_input = poll_input(g_input)
 
-    if g_game_state == GameStateType.MainGame then
+    if g_game_phase == GamePhase.MainGame then
         main_game_update(g_input)
-    elseif g_game_state == GameStateType.PreGame then
+    elseif g_game_phase == GamePhase.PreGame then
         pre_game_update(g_input)
-    elseif g_game_state == GameStateType.LoseGame then
+    elseif g_game_phase == GamePhase.LoseGame then
         lose_game_update(g_input)
-    elseif g_game_state == GameStateType.WinGame then
+    elseif g_game_phase == GamePhase.WinGame then
         win_game_update(g_input)
     end
 end
@@ -146,7 +146,7 @@ function pre_game_update(input)
     g_game_timer_ui.update(g_maingame_tick_count)
     if any_btn then
         g_game_timer_ui.set_blinking(false)
-        g_game_state = GameStateType.MainGame
+        g_game_phase = GamePhase.MainGame
         music(0, 1000, 7)
     end
 end
@@ -242,7 +242,7 @@ function main_game_update(input)
             substate = "scroll_timer",
             timer_scroll = 0,
         }
-        g_game_state = GameStateType.LoseGame
+        g_game_phase = GamePhase.LoseGame
         g_game_timer_ui.set_blinking(true)
         music(-1, 1000)
     end
@@ -390,7 +390,7 @@ function interact_with_tile(tile)
                     timer_scroll = 0,
                 }
                 g_game_timer_ui.set_blinking(true)
-                g_game_state = GameStateType.WinGame
+                g_game_phase = GamePhase.WinGame
                 music(-1, 1000)
             end
         else
@@ -526,12 +526,12 @@ function win_game_update(input)
 end
 
 function _draw()
-    if g_game_state == GameStateType.MainGame or
-       g_game_state == GameStateType.PreGame then
+    if g_game_phase == GamePhase.MainGame or
+       g_game_phase == GamePhase.PreGame then
        draw_game()
-    elseif g_game_state == GameStateType.LoseGame then
+    elseif g_game_phase == GamePhase.LoseGame then
         draw_lose_game()
-    elseif g_game_state == GameStateType.WinGame then
+    elseif g_game_phase == GamePhase.WinGame then
         draw_win_game()
     end
 end
