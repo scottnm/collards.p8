@@ -696,25 +696,6 @@ function center_text(rect, text)
     return { x = text_start_x, y = text_start_y + 1 }
 end
 
-function dbg_display_frame_stats(pos)
-    print("mem:  "..  stat(0), pos.x, pos.y + 00, Colors.White)
-    print("cpu:  "..  stat(1), pos.x, pos.y + 10, Colors.White)
-    print("fps(t): "..stat(8), pos.x, pos.y + 20, Colors.White)
-    print("fps(a): "..stat(7), pos.x, pos.y + 30, Colors.White)
-end
-
-function dbg_display_colliders()
-    circ(g_player.pos.x, g_player.pos.y, g_player.collider.radius, Colors.White)
-    for cell in all(g_map.cells) do
-        circ(cell.pos.x, cell.pos.y, cell.collider.radius, Colors.White)
-    end
-    for bomb in all(g_bombs) do
-        for e in all(bomb.get_explosions()) do
-            circ(e.pos.x, e.pos.y, e.collider.radius, Colors.White)
-        end
-    end
-end
-
 function draw_hint_arrow(pos_center, hint)
     local frame = nil
     local flip_x = nil

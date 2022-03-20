@@ -16,7 +16,7 @@ if (!$OutputCartName)
 }
 
 $Cart = Get-Item $Path
-$cartIncludes = sls "#include\s+([A-Za-z_]+.lua)" $Cart.FullName
+$cartIncludes = sls "^#include\s+([A-Za-z_]+.lua)" $Cart.FullName
 
 cp $Path $OutputCartName
 $tmpLuaFile = (Get-Item $OutputCartName).BaseName + ".lua"
