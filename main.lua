@@ -3,8 +3,7 @@
 GamePhase = {
     PreGame = 1,
     MainGame = 2,
-    LoseGame = 3,
-    WinGame = 4,
+    GameOver = 3,
 }
 
 TileType = {
@@ -36,7 +35,7 @@ HintArrow = {
     UpLeft = 8,
 }
 
-PlayerBookState = {
+BookState = {
     NotFound = 1,
     FoundButLost = 2,
     Holding = 3,
@@ -76,14 +75,15 @@ function reset()
     g_banner = nil
     g_maingame_tick_count = 0
     g_game_phase = GamePhase.PreGame
-    g_lose_game_state = nil
-    g_player = {}
-    g_player.book_state = PlayerBookState.NotFound
-    g_player.pos = { x = 0, y = 0 }
-    g_player.sprite_offset = { x = -8, y = -14 }
-    g_player.collider = { radius = 3 }
-    g_player.bomb_count = 0
-    g_player.collected_pages = {}
+    g_game_over_state = nil
+    g_player = {
+        book_state = BookState.NotFound,
+        pos = { x = 0, y = 0 },
+        sprite_offset = { x = -8, y = -14 },
+        collider = { radius = 3 },
+        bomb_count = 0,
+        collected_pages = {},
+    }
 
     g_camera_player_offset = { x = 0, y = 0 }
 
@@ -111,7 +111,7 @@ function reset()
         CollectItem = create_anim_flow({46}, 1, 2, false),
         BombCountdown = create_anim_flow({74, 74, 74, 74, 74, 74, 74, 75, 74, 74, 75, 74, 74, 75, 74}, 15, 1, false),
     }
-    g_game_timer_ui = make_ui_timer(on_ui_timer_flash, MAINGAME_TIME_LIMIT())
+    g_game_timer_ui = make_ui_timer(on_ui_timer_shake, MAINGAME_TIME_LIMIT())
     g_game_timer_ui.set_blinking(true)
 
     -- TODO: sometimes I refer to these as maps. Sometimes as levels. I should fix this. It's confusing
@@ -127,10 +127,8 @@ function _update()
         main_game_update(g_input)
     elseif g_game_phase == GamePhase.PreGame then
         pre_game_update(g_input)
-    elseif g_game_phase == GamePhase.LoseGame then
-        lose_game_update(g_input)
-    elseif g_game_phase == GamePhase.WinGame then
-        win_game_update(g_input)
+    elseif g_game_phase == GamePhase.GameOver then
+        game_over_update(g_input)
     end
 end
 
@@ -220,7 +218,7 @@ function main_game_update(input)
         end
 
         for e in all(bomb.get_explosions()) do
-            local explosion_cells = get_iso_cells_under_actor(g_map, e)
+            local explosion_cells = get_cells_under_actor(g_map, e)
             for cell in all(explosion_cells) do
                 cell.tile.visible = true
             end
@@ -238,11 +236,12 @@ function main_game_update(input)
     end
 
     if g_maingame_tick_count >= MAINGAME_TIME_LIMIT() then
-        g_lose_game_state = {
+        handle_game_over(false)
+        g_game_over_state = {
             substate = "scroll_timer",
             timer_scroll = 0,
         }
-        g_game_phase = GamePhase.LoseGame
+        g_game_phase = GamePhase.GameOver
         g_game_timer_ui.set_blinking(true)
         music(-1, 1000)
     end
@@ -301,7 +300,7 @@ function handle_new_input(input)
 
     local player_iso_tile_idx = get_actor_iso_tile_idx(g_map, g_player)
     if player_iso_tile_idx != nil then
-        local player_iso_cell = g_map.isocells[player_iso_tile_idx]
+        local player_cell = g_map.cells[player_iso_tile_idx]
 
         -- If we've just dug up a tile, we'll set a callback so that after
         -- the digging animation reveals the tile, we'll automatically
@@ -309,22 +308,22 @@ function handle_new_input(input)
         if is_digging then
             local reveal_tile_callback = function()
                 sfx(Sfxs.Dig)
-                player_iso_cell.tile.visible = true
-                interact_with_tile(player_iso_cell.tile)
+                player_cell.tile.visible = true
+                interact_with_tile(player_cell.tile)
             end
             g_player.dig_state.on_dig_up = reveal_tile_callback
-        elseif player_iso_cell.tile.visible then
-            interact_with_tile(player_iso_cell.tile)
-            g_player.last_interacted_isocell = player_iso_cell
-        elseif player_iso_cell.tile.has_book then
+        elseif player_cell.tile.visible then
+            interact_with_tile(player_cell.tile)
+            g_player.last_interacted_cell = player_cell
+        elseif player_cell.tile.has_book then
             -- HACK: special case to support picking up books from unrevealed tiles
-            g_player.book_state = PlayerBookState.Holding
-            player_iso_cell.tile.has_book = false
+            g_player.book_state = BookState.Holding
+            player_cell.tile.has_book = false
             collect_item(g_player, ItemType.Book)
-            g_player.last_interacted_isocell = player_iso_cell
+            g_player.last_interacted_cell = player_cell
         end
 
-        g_player.last_visited_isocell = player_iso_cell
+        g_player.last_visited_cell = player_cell
     end
 
     -- Handle placing new bombs
@@ -344,11 +343,11 @@ end
 
 function kill_player(player, map)
     local died_text = "died."
-    if player.book_state == PlayerBookState.Holding then
+    if player.book_state == BookState.Holding then
         -- drop the book in a random safe cell
         local safe_tile_idx = select_random_empty_tile_idx_from_map(map)
-        map.isocells[safe_tile_idx].tile.has_book = true
-        g_player.book_state = PlayerBookState.FoundButLost
+        map.cells[safe_tile_idx].tile.has_book = true
+        g_player.book_state = BookState.FoundButLost
         died_text = died_text.." dropped book."
     end
 
@@ -363,7 +362,7 @@ end
 
 function interact_with_tile(tile)
     -- only interact with a tile the first time you step on it.
-    if tile == g_player.last_interacted_isocell.tile then
+    if tile == g_player.last_interacted_cell.tile then
         return
     end
 
@@ -371,27 +370,21 @@ function interact_with_tile(tile)
         start_move_to_floor(g_map.level_id + 1, TileType.FloorEntry, Sfxs.UpStairs)
     elseif tile.type == TileType.FloorEntry then
         -- if we haven't found the book and we try to leave, warn the player
-        if g_player.book_state == PlayerBookState.NotFound then
+        if g_player.book_state == BookState.NotFound then
             set_banner("can't leave until i find it.", "warning", 90)
-        elseif g_player.book_state == PlayerBookState.FoundButLost then
+        elseif g_player.book_state == BookState.FoundButLost then
             -- if we've found the book but lost it we can freely traverse all floors... EXCEPT we can't leave
             if g_map.level_id != 1 then
                 start_move_to_floor(g_map.level_id - 1, TileType.FloorExit, Sfxs.UpStairs)
             else
                 set_banner("can't leave. i lost the book.", "warning", 90)
             end
-        elseif g_player.book_state == PlayerBookState.Holding then
+        elseif g_player.book_state == BookState.Holding then
             -- we have the book. we can traverse up any floor AND win the game by leaving the last floor
             if g_map.level_id != 1 then
                 start_move_to_floor(g_map.level_id - 1, TileType.FloorExit, Sfxs.UpStairs)
             else
-                g_win_game_state = {
-                    substate = "scroll_timer",
-                    timer_scroll = 0,
-                }
-                g_game_timer_ui.set_blinking(true)
-                g_game_phase = GamePhase.WinGame
-                music(-1, 1000)
+                handle_game_over(true)
             end
         else
             assert(false)
@@ -410,13 +403,13 @@ function interact_with_tile(tile)
         tile.type = TileType.Empty
         tile.page_frag = nil
     elseif tile.has_book then
-        g_player.book_state = PlayerBookState.Holding
+        g_player.book_state = BookState.Holding
         tile.has_book = false
         collect_item(g_player, ItemType.Book)
     end
 end
 
-function on_ui_timer_flash()
+function on_ui_timer_shake()
     sfx(Sfxs.ClockBeep)
 end
 
@@ -459,67 +452,44 @@ function camera_follow_player(player, camera_ofs)
     end
 
     -- If the camera is outside of the max allowed distance, move it closer
-    local dir_vector = sub_vec2(camera_ofs, player_camera_center_ofs)
+    local dir_vec = sub_vec2(camera_ofs, player_camera_center_ofs)
 
     -- take the distance and divide it out to get the unit vector
     local dist = sqrt(dist_squared)
-    dir_vector.x /= dist
-    dir_vector.y /= dist
+    dir_vec.x /= dist
+    dir_vec.y /= dist
 
     -- multiply the max distance to get our max distance from player
-    dir_vector.x *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
-    dir_vector.y *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
+    dir_vec.x *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
+    dir_vec.y *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
 
-    new_ofs = add_vec2(player.pos, dir_vector)
+    new_ofs = add_vec2(player.pos, dir_vec)
     camera_ofs.x = new_ofs.x - 64
     camera_ofs.y = new_ofs.y - 64
 end
 
-function lose_game_update(input)
+function game_over_update(input)
     g_game_timer_ui.update(g_maingame_tick_count)
 
-    if g_lose_game_state.substate == "scroll_timer" then
-        g_lose_game_state.timer_scroll += 1
+    if g_game_over_state.substate == "scroll_timer" then
+        g_game_over_state.timer_scroll += 1
         g_game_timer_ui.move(0, 0.5)
-        if g_lose_game_state.timer_scroll == 120 then
-            g_lose_game_state.substate = "brief_blink"
-            g_lose_game_state.final_blink = make_ingame_timer(120)
+        if g_game_over_state.timer_scroll == 120 then
+            g_game_over_state.substate = "brief_blink"
+            g_game_over_state.final_blink = make_ingame_timer(120)
         end
-    elseif g_lose_game_state.substate == "brief_blink" then
-        g_lose_game_state.final_blink.update()
-        if g_lose_game_state.final_blink.done() then
-            g_lose_game_state.substate = "display_lose_text"
-            g_lose_game_state.lose_text_roll_timer = make_ingame_timer(240)
-            g_lose_game_state.lose_text = "you were unable to make\nyour way to the bottom\nof the grave in time.\n\nyour family's most\ncherished heirloom is\nlost. gone forever.\n\nthis is unacceptable.\nwe'll have to try again.\n\nx/c - to reset"
+    elseif g_game_over_state.substate == "brief_blink" then
+        g_game_over_state.final_blink.update()
+        if g_game_over_state.final_blink.done() then
+            g_game_over_state.substate = "display_game_over_text"
+            g_game_over_state.game_over_text_roll_spd = 0.8 -- chars per frame
+            g_game_over_state.game_over_text_frame_cnt = 0
+            g_game_over_state.game_over_text_final_frame_cnt = (#g_game_over_state.game_over_text) / g_game_over_state.game_over_text_roll_spd
         end
-    elseif g_lose_game_state.substate == "display_lose_text" then
-        g_lose_game_state.lose_text_roll_timer.update()
-        if g_lose_game_state.lose_text_roll_timer.done() and (input.btn_x or input.btn_o) then
-            reset()
-        end
-    end
-end
-
-function win_game_update(input)
-    g_game_timer_ui.update(g_maingame_tick_count)
-
-    if g_win_game_state.substate == "scroll_timer" then
-        g_win_game_state.timer_scroll += 1
-        g_game_timer_ui.move(0, 0.5)
-        if g_win_game_state.timer_scroll == 120 then
-            g_win_game_state.substate = "brief_blink"
-            g_win_game_state.final_blink = make_ingame_timer(120)
-        end
-    elseif g_win_game_state.substate == "brief_blink" then
-        g_win_game_state.final_blink.update()
-        if g_win_game_state.final_blink.done() then
-            g_win_game_state.substate = "display_win_text"
-            g_win_game_state.win_text_roll_timer = make_ingame_timer(240)
-            g_win_game_state.win_text = generate_win_text(#g_player.collected_pages, TOTAL_PAGE_COUNT())
-        end
-    elseif g_win_game_state.substate == "display_win_text" then
-        g_win_game_state.win_text_roll_timer.update()
-        if g_win_game_state.win_text_roll_timer.done() and (input.btn_x or input.btn_o) then
+    elseif g_game_over_state.substate == "display_game_over_text" then
+        g_game_over_state.game_over_text_frame_cnt += 1
+        local text_finished = g_game_over_state.game_over_text_frame_cnt >= g_game_over_state.game_over_text_final_frame_cnt
+        if text_finished and (input.btn_x or input.btn_o) then
             reset()
         end
     end
@@ -529,10 +499,8 @@ function _draw()
     if g_game_phase == GamePhase.MainGame or
        g_game_phase == GamePhase.PreGame then
        draw_game()
-    elseif g_game_phase == GamePhase.LoseGame then
-        draw_lose_game()
-    elseif g_game_phase == GamePhase.WinGame then
-        draw_win_game()
+    elseif g_game_phase == GamePhase.GameOver then
+        draw_game_over()
     end
 end
 
@@ -548,38 +516,38 @@ function draw_game()
     --
 
     -- draw iso map
-    for isocell in all(g_map.isocells) do
-        local frame_idx = get_iso_tile_sprite_frame(isocell.tile)
+    for cell in all(g_map.cells) do
+        local frame_idx = get_iso_tile_sprite_frame(cell.tile)
         if frame_idx != nil then
             -- DRAW A THIN BORDER
-            spr(128, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y, 4, 2, false)
-            spr(frame_idx, isocell.pos.x - ISO_TILE_WIDTH()/2, isocell.pos.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
+            spr(128, cell.pos.x - ISO_TILE_WIDTH()/2, cell.pos.y, 4, 2, false)
+            spr(frame_idx, cell.pos.x - ISO_TILE_WIDTH()/2, cell.pos.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
 
-            if isocell.tile.visible then
+            if cell.tile.visible then
                 -- draw the hint arrow if the empty hint cell is visible
-                if (isocell.tile.type == TileType.Empty) and (isocell.tile.hint != nil) then
-                    draw_hint_arrow(isocell.pos, isocell.tile.hint)
+                if (cell.tile.type == TileType.Empty) and (cell.tile.hint != nil) then
+                    draw_hint_arrow(cell.pos, cell.tile.hint)
                 -- If it's an unretrieved bomb cell, display an inactive bomb sprite in the middle of the cell.
                 -- N.B. this basically only happens if you use a bomb to reveal another bomb.
-                elseif isocell.tile.type == TileType.BombItem then
-                    draw_bomb_item(isocell.pos)
-                elseif isocell.tile.type == TileType.PageItem then
-                    draw_page_item(isocell.pos, isocell.tile.page_frag)
-                elseif isocell.tile.type == TileType.Altar then
+                elseif cell.tile.type == TileType.BombItem then
+                    draw_bomb_item(cell.pos)
+                elseif cell.tile.type == TileType.PageItem then
+                    draw_page_item(cell.pos, cell.tile.page_frag)
+                elseif cell.tile.type == TileType.Altar then
                     -- draw the altar
-                    spr_centered(88, isocell.pos.x, isocell.pos.y, 2, 1)
+                    spr_centered(88, cell.pos.x, cell.pos.y, 2, 1)
                 end
             end
 
-            if isocell.tile.has_book then
-                draw_book(isocell.pos, isocell.tile.type == TileType.Altar)
+            if cell.tile.has_book then
+                draw_book(cell.pos, cell.tile.type == TileType.Altar)
             end
         end
     end
 
     -- if the player is standing on their last visited isotile, highlight it
-    if circ_colliders_overlap(g_player, g_player.last_visited_isocell) then
-        highlight_iso_cell(g_player.last_visited_isocell)
+    if circ_colliders_overlap(g_player, g_player.last_visited_cell) then
+        highlight_cell(g_player.last_visited_cell)
     end
 
     --
@@ -646,15 +614,15 @@ function draw_game()
     -- dbg_display_frame_stats({ x = 80, y = 80 })
 end
 
-function draw_lose_game()
+function draw_game_over()
     cls(Colors.BLACK)
 
-    if g_lose_game_state.substate != "display_lose_text" then
+    if g_game_over_state.substate != "display_game_over_text" then
         -- Set the camera view so that the world is draw relative to its position
         camera_follow_player(g_player, g_camera_player_offset)
         camera(g_camera_player_offset.x, g_camera_player_offset.y);
 
-        -- draw the player frozen at the lose state
+        -- draw the player frozen at the game_over state
         local player_sprite_pos = sprite_pos(g_player)
         draw_anim(g_player, player_sprite_pos)
 
@@ -670,44 +638,30 @@ function draw_lose_game()
         -- draw the in-game timer UI
         g_game_timer_ui.draw(g_maingame_tick_count)
     else
-        local rolled_text_ratio = g_lose_game_state.lose_text_roll_timer.get_elapsed_ratio()
-        local end_char = flr((#g_lose_game_state.lose_text) * rolled_text_ratio)
-        local lose_text = sub(g_lose_game_state.lose_text, 1, end_char)
-        print(lose_text, 10, 10, Colors.White)
+        local game_over_text = g_game_over_state.game_over_text
+        local rolled_text_ratio = (g_game_over_state.game_over_text_roll_spd * g_game_over_state.game_over_text_frame_cnt) / g_game_over_state.game_over_text_final_frame_cnt
+        local end_char = flr((#game_over_text) * rolled_text_ratio)
 
-        -- draw the page UI
-        draw_page_ui(g_player)
-    end
-end
+        -- get the start char by reverse iterating
+        local start_char = 1
+        local newline_cnt = 0
+        local newline_overflow = 17
+        for i=1,end_char do
+            local next_char_idx = end_char - (i - 1) -- iterate in reverse
+            local next_char = sub(game_over_text, next_char_idx, next_char_idx)
+            if next_char == "\n" then
+                newline_cnt += 1
+                if newline_cnt >= newline_overflow then
+                    start_char = next_char_idx + 1
+                    break
+                end
+            end
+        end
 
-function draw_win_game()
-    cls(Colors.BLACK)
+        --
 
-    if g_win_game_state.substate != "display_win_text" then
-        -- Set the camera view so that the world is draw relative to its position
-        camera_follow_player(g_player, g_camera_player_offset)
-        camera(g_camera_player_offset.x, g_camera_player_offset.y);
-
-        -- draw the player frozen at the win state
-        local player_sprite_pos = sprite_pos(g_player)
-        draw_anim(g_player, player_sprite_pos)
-
-        -- draw the page UI
-        draw_page_ui(g_player)
-
-        -- reset the camera to 0 keep the UI fixed on screen
-        camera(0, 0)
-
-        -- draw the level UI
-        print("Level: "..g_map.level_id, 0, 120, Colors.White)
-
-        -- draw the in-game timer UI
-        g_game_timer_ui.draw(g_maingame_tick_count)
-    else
-        local rolled_text_ratio = g_win_game_state.win_text_roll_timer.get_elapsed_ratio()
-        local end_char = flr((#g_win_game_state.win_text) * rolled_text_ratio)
-        local win_text = sub(g_win_game_state.win_text, 1, end_char)
-        print(win_text, 10, 10, Colors.White)
+        game_over_text = sub(game_over_text, start_char, end_char)
+        print(game_over_text, 10, 10, Colors.White)
 
         -- draw the page UI
         draw_page_ui(g_player)
@@ -751,7 +705,7 @@ end
 
 function dbg_display_colliders()
     circ(g_player.pos.x, g_player.pos.y, g_player.collider.radius, Colors.White)
-    for cell in all(g_map.isocells) do
+    for cell in all(g_map.cells) do
         circ(cell.pos.x, cell.pos.y, cell.collider.radius, Colors.White)
     end
     for bomb in all(g_bombs) do
@@ -892,11 +846,11 @@ function generate_maps(num_maps)
     for map in all(maps) do
         -- set the start cell on this map.
         local player_start_iso_idx = select_random_empty_tile_idx_from_map(map)
-        map.isocells[player_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
+        map.cells[player_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
 
         -- set the finish cell on this map.
         map.finish_cell_idx = select_random_empty_tile_idx_from_map(map)
-        map.isocells[map.finish_cell_idx].tile = make_tile(false, TileType.FloorExit)
+        map.cells[map.finish_cell_idx].tile = make_tile(false, TileType.FloorExit)
     end
 
     -- generate the trap cells in each map
@@ -905,7 +859,7 @@ function generate_maps(num_maps)
         local trap_cell_cnt = flr(map.iso_width * map.iso_width * 0.30)
         local trap_cells = select_random_empty_tiles({map}, trap_cell_cnt)
         for trap_cell in all(trap_cells) do
-            map.isocells[trap_cell.idx].tile = make_tile(false, TileType.Trap)
+            map.cells[trap_cell.idx].tile = make_tile(false, TileType.Trap)
         end
     end
 
@@ -914,7 +868,7 @@ function generate_maps(num_maps)
     local bomb_cell_cnt = 10
     local bomb_cells = select_random_empty_tiles(maps, bomb_cell_cnt)
     for bomb_cell in all(bomb_cells) do
-        bomb_cell.map.isocells[bomb_cell.idx].tile = make_tile(false, TileType.BombItem)
+        bomb_cell.map.cells[bomb_cell.idx].tile = make_tile(false, TileType.BombItem)
     end
 
     -- generate the page item cells
@@ -924,43 +878,43 @@ function generate_maps(num_maps)
     local page_cell_cnt = TOTAL_PAGE_COUNT()
     local page_cells = select_random_empty_tiles(maps, page_cell_cnt)
     for page_cell in all(page_cells) do
-        page_cell.map.isocells[page_cell.idx].tile = make_tile(false, TileType.PageItem)
-        page_cell.map.isocells[page_cell.idx].tile.page_frag = page_fragments[next_page_frag_idx + 1]
+        page_cell.map.cells[page_cell.idx].tile = make_tile(false, TileType.PageItem)
+        page_cell.map.cells[page_cell.idx].tile.page_frag = page_fragments[next_page_frag_idx + 1]
         next_page_frag_idx = ((next_page_frag_idx + 1) % #page_fragments)
     end
 
     -- Now that all interesting cells have been placed, fill in the remaining empty
     -- cells with hint arrows
     for map in all(maps) do
-        local iso_finish_cell_pos = map.isocells[map.finish_cell_idx].pos
-        for cell in all(map.isocells) do
+        local iso_finish_cell_pos = map.cells[map.finish_cell_idx].pos
+        for cell in all(map.cells) do
             if cell.tile.type == TileType.Empty then
-                local dir_vector = sub_vec2(iso_finish_cell_pos, cell.pos)
-                local unit_circle_ratio = atan2(dir_vector.x, -1 * dir_vector.y)
+                local dir_vec = sub_vec2(iso_finish_cell_pos, cell.pos)
+                local unit_circle_ratio = atan2(dir_vec.x, -1 * dir_vec.y)
                 local angle_to_finish_point_deg = unit_circle_ratio * 360
 
-                local hint_arrow = nil
+                local hint = nil
                 if     angle_to_finish_point_deg <  22.5 then
-                    hint_arrow = HintArrow.Right
+                    hint = HintArrow.Right
                 elseif angle_to_finish_point_deg <  67.5 then
-                    hint_arrow = HintArrow.DownRight
+                    hint = HintArrow.DownRight
                 elseif angle_to_finish_point_deg < 112.5 then
-                    hint_arrow = HintArrow.Down
+                    hint = HintArrow.Down
                 elseif angle_to_finish_point_deg < 157.5 then
-                    hint_arrow = HintArrow.DownLeft
+                    hint = HintArrow.DownLeft
                 elseif angle_to_finish_point_deg < 202.5 then
-                    hint_arrow = HintArrow.Left
+                    hint = HintArrow.Left
                 elseif angle_to_finish_point_deg < 247.5 then
-                    hint_arrow = HintArrow.UpLeft
+                    hint = HintArrow.UpLeft
                 elseif angle_to_finish_point_deg < 292.5 then
-                    hint_arrow = HintArrow.Up
+                    hint = HintArrow.Up
                 elseif angle_to_finish_point_deg < 337.5 then
-                    hint_arrow = HintArrow.UpRight
+                    hint = HintArrow.UpRight
                 else
-                    hint_arrow = HintArrow.Right
+                    hint = HintArrow.Right
                 end
 
-                cell.tile.hint = hint_arrow
+                cell.tile.hint = hint
             end
         end
     end
@@ -971,13 +925,13 @@ function generate_maps(num_maps)
     local final_map = generate_empty_level(num_maps, MAX_TILE_LINE())
     -- set the final level's entry
     local final_map_start_iso_idx = select_random_empty_tile_idx_from_map(final_map)
-    final_map.isocells[final_map_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
+    final_map.cells[final_map_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
     -- set the altar point
     local altar_cell_idx = select_random_empty_tile_idx_from_map(final_map)
-    final_map.isocells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
-    final_map.isocells[altar_cell_idx].tile.has_book = true
+    final_map.cells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
+    final_map.cells[altar_cell_idx].tile.has_book = true
     -- turn every other cell into a stone floor cell
-    for cell in all(final_map.isocells) do
+    for cell in all(final_map.cells) do
         if cell.tile.type == TileType.Empty then
             cell.tile = make_tile(true, TileType.StoneFloor)
         end
@@ -986,14 +940,14 @@ function generate_maps(num_maps)
 
     -- uncomment this to make all tiles visible at start
     -- for map in all(maps) do
-    --     for cell in all(map.isocells) do
+    --     for cell in all(map.cells) do
     --         cell.tile.visible = true
     --     end
     -- end
 
     -- uncomment this to make all exit tiles and page tiles visible at start
     -- for map in all(maps) do
-    --     for cell in all(map.isocells) do
+    --     for cell in all(map.cells) do
     --         if cell.tile.type == TileType.PageItem then
     --             cell.tile.visible = true
     --         elseif cell.tile.type == TileType.FloorExit then
@@ -1012,7 +966,7 @@ function generate_empty_level(level_id, map_iso_width)
     next_map.iso_width = map_iso_width
 
     -- generate the isomap. initialize all at the start to empty
-    next_map.isocells = {}
+    next_map.cells = {}
     -- add an two extra rows to each side of the map so we can wrap the map with fall tiles
     local row_cnt = isomap_row_cnt(next_map) + 4
     local idx = 1
@@ -1052,7 +1006,7 @@ function generate_empty_level(level_id, map_iso_width)
                 collider = { radius = 4 }
             }
 
-            add(next_map.isocells, cell)
+            add(next_map.cells, cell)
             idx += 1
         end
     end
@@ -1072,7 +1026,7 @@ function select_random_empty_tiles(maps, select_count)
     local empty_cell_cnt = 0
     local empty_cells = {}
     for map in all(maps) do
-        for cell in all(map.isocells) do
+        for cell in all(map.cells) do
             if cell.tile.type == TileType.Empty then
                 add(empty_cells, { map = map, idx = cell.idx })
                 empty_cell_cnt += 1
@@ -1133,7 +1087,7 @@ function move_to_level(next_level, start_tile_type)
 
     -- place the player on the center of the iso tile
     local player_start_cell = nil
-    for cell in all(g_map.isocells) do
+    for cell in all(g_map.cells) do
         if cell.tile.type == start_tile_type then
             player_start_cell = cell
             break
@@ -1141,8 +1095,8 @@ function move_to_level(next_level, start_tile_type)
     end
     assert(player_start_cell != nil)
     g_player.pos = copy_vec2(player_start_cell.pos)
-    g_player.last_visited_isocell = player_start_cell
-    g_player.last_interacted_isocell = player_start_cell
+    g_player.last_visited_cell = player_start_cell
+    g_player.last_interacted_cell = player_start_cell
 
     -- place the camera on top of the player
     g_camera_player_offset = get_centered_camera_on_player(g_player)
@@ -1212,7 +1166,7 @@ function move_player(input)
         g_player.pos = add_vec2(old_player_pos, move)
 
         -- check if we've standing on any fall tiles and if so, rollback the movement
-        local cells = get_iso_cells_under_actor(g_map, g_player)
+        local cells = get_cells_under_actor(g_map, g_player)
         local valid_move = true
         for cell in all(cells) do
             if cell.tile.type == TileType.Fall then
@@ -1287,7 +1241,7 @@ end
 function get_actor_iso_tile_idx(map, actor)
     -- N.B. Currently we do an extra smaller circle collider check so that we only activate at most one tile at a time
     -- even if we are standing in between two..
-    for cell in all(get_iso_cells_under_actor(map, actor)) do
+    for cell in all(get_cells_under_actor(map, actor)) do
         if circ_colliders_overlap(actor, cell) then
             return cell.idx
         end
@@ -1302,10 +1256,10 @@ function circ_colliders_overlap(obj1, obj2)
     return dist_squared <= max_dist_squared
 end
 
-function get_iso_cells_under_actor(map, actor)
+function get_cells_under_actor(map, actor)
     cells = {}
-    for cell in all(map.isocells) do
-        if is_iso_cell_under_actor(cell, actor) then
+    for cell in all(map.cells) do
+        if is_cell_under_actor(cell, actor) then
             add(cells, cell)
         end
     end
@@ -1313,7 +1267,7 @@ function get_iso_cells_under_actor(map, actor)
     return cells
 end
 
-function is_iso_cell_under_actor(cell, actor)
+function is_cell_under_actor(cell, actor)
     -- divide up an iso-tile into 3 rect colliders
     local iso_sub_colliders = {
         { width = 12, height = 12 },
@@ -1359,7 +1313,7 @@ function rect_colliders_overlap(c1, c2)
     return true
 end
 
-function highlight_iso_cell(cell)
+function highlight_cell(cell)
     local cell_pos_x = cell.pos.x
     local cell_pos_y = cell.pos.y
     -- N.B. for some reason, I need to subtract '1' from each of the y values. I haven't yet rationalized why
@@ -1530,10 +1484,14 @@ function split_text(text)
     return split_text
 end
 
+function generate_lose_text()
+    return "you were unable to make\nyour way to the bottom\nof the grave in time.\n\nyour family's most\ncherished heirloom is\nlost. gone forever.\n\nthis is unacceptable.\nyou'll have to try again.\n\nx/c - to reset"
+end
+
 function generate_win_text(collected_page_count, total_page_count)
-    local text = "you made it back with the book, a brown book stitched together with strong thread and thick brown pages, a family heirloom."
+    local text = "you made it back with the book. a brown book stitched together with strong thread and thick brown pages. a family heirloom."
     if collected_page_count == 0 then
-        text = text .. " opening the book you realize several pages are missing. maybe they're back down in the grave, but there isn't time to check. i guess there's some comfort knowing you have the book at all. in another life, maybe you could find those pages.\n\nx/c - to reset"
+        text = text .. " opening the book you realize several pages are missing. maybe they're back down in the grave. at least you saved the book. in another life, maybe you could find those pages.\n\nx/c - to reset"
     elseif collected_page_count < total_page_count then
         local page_plural = nil
         if collected_page_count == 1 then
@@ -1549,9 +1507,9 @@ function generate_win_text(collected_page_count, total_page_count)
             gap_plural = "are still "..(total_page_count-collected_page_count).." pages missing. maybe the rest are"
         end
 
-        text = text .. " setting the "..collected_page_count.." recovered "..page_plural.." in the book you realize there "..gap_plural.." back down in the grave. there's no time to check. it's not whole, but there's comfort in what you have. in another life, maybe we could recover the rest.\n\nx/c - to reset"
+        text = text .. " setting the "..collected_page_count.." recovered "..page_plural.." in the book you realize there "..gap_plural.." back down in the grave. it's not whole, but there's comfort in what you have. in another life, maybe you could recover the rest.\n\nx/c - to reset"
     else
-        text = text .. " setting all "..total_page_count.." pages you found below in the book you realize the book is complete.\n\nx/c - to reset"
+        text = text .. " setting all "..total_page_count.." pages you found below in the book, you realize the book is complete.\nit reveals its story to you.\n\nthe first page reads:\n\"collard greens. wash greens 7 times. tear 'em up. throw 'em in a large pot. cover greens with water.  add onion, garlic, some peppa, spoonful of vinegar, and one ham hock. cover the pot and bring to a boil.\n\nthe book's previous owner was a driven, young man who desperately wanted to raise his daughter well. a self-taught cook, he learned that the collard recipe was full of love, flavor, and the secret ingredient, perseverance. a giant sunday pot of collards became tradition, providing them with greens for the whole week.\"\nx/c - to reset"
     end
     return split_text(text)
 end
@@ -1574,6 +1532,21 @@ end
 
 function scale_vec2(v, s)
     return { x = v.x * s, y = v.y * s }
+end
+
+function handle_game_over(game_won)
+    g_game_over_state = {
+        substate = "scroll_timer",
+        timer_scroll = 0,
+    }
+    if game_won then
+        g_game_over_state.game_over_text = generate_win_text(#g_player.collected_pages, TOTAL_PAGE_COUNT())
+    else
+        g_game_over_state.game_over_text = generate_lose_text()
+    end
+    g_game_timer_ui.set_blinking(true)
+    g_game_phase = GamePhase.GameOver
+    music(-1, 1000)
 end
 
 -- TODO: keep track of things I still need to do so I don't forget
