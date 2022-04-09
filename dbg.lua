@@ -7,12 +7,12 @@ function dbg_display_frame_stats(pos)
     print("fps(a): "..stat(7), pos.x, pos.y + 30, Colors.White)
 end
 
-function dbg_display_colliders()
-    circ(g_player.pos.x, g_player.pos.y, g_player.collider.radius, Colors.White)
-    for cell in all(g_map.cells) do
+function dbg_display_colliders(player, map, bombs)
+    circ(player.pos.x, player.pos.y, player.collider.radius, Colors.White)
+    for cell in all(map.cells) do
         circ(cell.pos.x, cell.pos.y, cell.collider.radius, Colors.White)
     end
-    for bomb in all(g_bombs) do
+    for bomb in all(bombs) do
         for e in all(bomb.get_explosions()) do
             circ(e.pos.x, e.pos.y, e.collider.radius, Colors.White)
         end
@@ -20,25 +20,44 @@ function dbg_display_colliders()
 end
 
 function dbg_display_anim_state(obj, pos, anims)
-    local flip_string = nil
-    if obj.anim_state.flip then
-        flip_string = "true"
+    local anim_state = obj.anim_state
+    local flip = ""
+    if anim_state.flip then
+        flip = "true"
     else
-        flip_string = "false"
+        flip = "false"
     end
 
-    local flow_string = ""
+    local anim_name = ""
     for k,v in pairs(anims) do
-        if v == obj.anim_state.last_flow then
-            flow_string = k
+        if v == anim_state.last_anim then
+            anim_name = k
             break
         end
     end
 
-    print("a_ct: "..     obj.anim_state.a_ct, pos.x, pos.y + 00, Colors.White)
-    print("a_st: "..     obj.anim_state.a_st, pos.x, pos.y + 10, Colors.White)
-    print("a_fr: "..     obj.anim_state.a_fr, pos.x, pos.y + 20, Colors.White)
-    print("flip: "..             flip_string, pos.x, pos.y + 30, Colors.White)
-    print("ts:   "..obj.anim_state.tile_size, pos.x, pos.y + 40, Colors.White)
-    print("lf:   "..             flow_string, pos.x, pos.y + 50, Colors.White)
+    print("a_ct: "..     anim_state.a_ct, pos.x, pos.y + 00, Colors.White)
+    print("a_st: "..     anim_state.a_st, pos.x, pos.y + 10, Colors.White)
+    print("a_fr: "..     anim_state.a_fr, pos.x, pos.y + 20, Colors.White)
+    print("flip: "..                flip, pos.x, pos.y + 30, Colors.White)
+    print("ts:   "..anim_state.tile_size, pos.x, pos.y + 40, Colors.White)
+    print("last: "..           anim_name, pos.x, pos.y + 50, Colors.White)
+end
+
+function dbg_set_tiles_visible(maps, tile_types)
+    for map in all(maps) do
+        for cell in all(map.cells) do
+            local tile = cell.tile
+            if tile_types == nil then
+                tile.visible = true
+            else
+                for tt in all(tile_type) do
+                    if tile.type == tt then
+                        tile.visible = true
+                        break
+                    end
+                end
+            end
+        end
+    end
 end

@@ -88,34 +88,33 @@ function reset()
     g_camera_player_offset = { x = 0, y = 0 }
 
     g_anims = {
-        IdleDown = create_anim_flow({34}, 10, 2, false),
-        WalkDown = create_anim_flow({32, 34, 36}, 10, 2, false),
-        IdleUp = create_anim_flow({40}, 10, 2, false),
-        WalkUp = create_anim_flow({38, 40, 42}, 10, 2, false),
-        IdleRight = create_anim_flow({66}, 10, 2, false),
-        WalkRight = create_anim_flow({64, 66, 68}, 10, 2, false),
-        IdleLeft = create_anim_flow({66}, 10, 2, true),
-        WalkLeft = create_anim_flow({64, 66, 68}, 10, 2, true),
-        IdleUpRight = create_anim_flow({8}, 10, 2, false),
-        WalkUpRight = create_anim_flow({6, 8, 10}, 10, 2, false),
-        IdleDownRight = create_anim_flow({2}, 10, 2, false),
-        WalkDownRight = create_anim_flow({0, 2, 4}, 10, 2, false),
-        IdleUpLeft = create_anim_flow({8}, 10, 2, true),
-        WalkUpLeft = create_anim_flow({6, 8, 10}, 10, 2, true),
-        IdleDownLeft = create_anim_flow({2}, 10, 2, true),
-        WalkDownLeft = create_anim_flow({0, 2, 4}, 10, 2, true),
-        DigRight = create_anim_flow({12, 12, 14}, 5, 2, false),
-        DigLeft = create_anim_flow({12, 12, 14}, 5, 2, true),
-        DieLeft = create_anim_flow({70, 70, 238}, 5, 2, true),
-        DieRight = create_anim_flow({70, 70, 238}, 5, 2, false),
-        CollectItem = create_anim_flow({46}, 1, 2, false),
-        BombCountdown = create_anim_flow({74, 74, 74, 74, 74, 74, 74, 75, 74, 74, 75, 74, 74, 75, 74}, 15, 1, false),
+        IdleDown = create_anim({34}, 10, 2, false),
+        WalkDown = create_anim({32, 34, 36}, 10, 2, false),
+        IdleUp = create_anim({40}, 10, 2, false),
+        WalkUp = create_anim({38, 40, 42}, 10, 2, false),
+        IdleRight = create_anim({66}, 10, 2, false),
+        WalkRight = create_anim({64, 66, 68}, 10, 2, false),
+        IdleLeft = create_anim({66}, 10, 2, true),
+        WalkLeft = create_anim({64, 66, 68}, 10, 2, true),
+        IdleUpRight = create_anim({8}, 10, 2, false),
+        WalkUpRight = create_anim({6, 8, 10}, 10, 2, false),
+        IdleDownRight = create_anim({2}, 10, 2, false),
+        WalkDownRight = create_anim({0, 2, 4}, 10, 2, false),
+        IdleUpLeft = create_anim({8}, 10, 2, true),
+        WalkUpLeft = create_anim({6, 8, 10}, 10, 2, true),
+        IdleDownLeft = create_anim({2}, 10, 2, true),
+        WalkDownLeft = create_anim({0, 2, 4}, 10, 2, true),
+        DigRight = create_anim({12, 12, 14}, 5, 2, false),
+        DigLeft = create_anim({12, 12, 14}, 5, 2, true),
+        DieLeft = create_anim({70, 70, 238}, 5, 2, true),
+        DieRight = create_anim({70, 70, 238}, 5, 2, false),
+        CollectItem = create_anim({46}, 1, 2, false),
+        BombFlash = create_anim({74, 74, 74, 74, 74, 74, 74, 75, 74, 74, 75, 74, 74, 75, 74}, 15, 1, false),
     }
     g_game_timer_ui = make_ui_timer(on_ui_timer_shake, MAINGAME_TIME_LIMIT())
     g_game_timer_ui.set_blinking(true)
 
-    -- TODO: sometimes I refer to these as maps. Sometimes as levels. I should fix this. It's confusing
-    g_maps = generate_maps(10)
+    g_maps = gen_maps(10)
     move_to_level(1, TileType.FloorEntry)
 end
 
@@ -224,7 +223,7 @@ function main_game_update(input)
             end
 
             -- check for player-explosion collisions if the player isn't already dead
-            if (g_player.die_state) == nil and (circ_colliders_overlap(g_player, e)) then
+            if (g_player.die_state == nil) and (circ_colliders_overlap(g_player, e)) then
                 kill_player(g_player, g_map)
             end
         end
@@ -284,15 +283,15 @@ function start_move_to_floor(next_level, start_tile_type, stair_sfx)
 end
 
 function handle_new_input(input)
-    move_player(g_input)
-    animate_player(g_input)
+    move_player(input)
+    animate_player(input)
 
-    local is_digging = g_input.btn_o and g_input.btn_o_change
+    local is_digging = input.btn_o and input.btn_o_change
 
     if is_digging then
         g_player.dig_state = {
             anim = get_dig_anim_for_player(g_player),
-            previous_anim = g_player.anim_state.last_flow }
+            previous_anim = g_player.anim_state.last_anim }
         -- reset the anim state so the digging animation always starts on frame 0
         reset_anim(g_player)
 
@@ -327,7 +326,7 @@ function handle_new_input(input)
     end
 
     -- Handle placing new bombs
-    local try_place_bomb = g_input.btn_x and g_input.btn_x_change
+    local try_place_bomb = input.btn_x and input.btn_x_change
     if try_place_bomb then
         if g_player.bomb_count > 0 then
             g_player.bomb_count -= 1
@@ -338,7 +337,7 @@ function handle_new_input(input)
 end
 
 function on_explosion_start()
-    sfx(Sfxs.BombExplosion)
+    sfx(Sfxs.Explosion)
 end
 
 function kill_player(player, map)
@@ -394,12 +393,12 @@ function interact_with_tile(tile)
     elseif tile.type == TileType.BombItem then
         g_player.bomb_count += 1
         collect_item(g_player, ItemType.Bomb)
-        -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
+        -- after we've picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
         tile.type = TileType.Empty
     elseif tile.type == TileType.PageItem then
         add(g_player.collected_pages, tile.page_frag)
         collect_item(g_player, ItemType.Page, { page_frag = tile.page_frag })
-        -- after weve picked up the bomb, flip the cell to be just a plain ole empty cell without a hint
+        -- after we've picked up the page, flip the cell to be just a plain ole empty cell without a hint
         tile.type = TileType.Empty
         tile.page_frag = nil
     elseif tile.has_book then
@@ -414,12 +413,13 @@ function on_ui_timer_shake()
 end
 
 function is_player_facing_left(player)
-    return (player.anim_state.last_flow == g_anims.IdleLeft or
-            player.anim_state.last_flow == g_anims.WalkLeft or
-            player.anim_state.last_flow == g_anims.IdleUpLeft or
-            player.anim_state.last_flow == g_anims.WalkUpLeft or
-            player.anim_state.last_flow == g_anims.IdleDownLeft or
-            player.anim_state.last_flow == g_anims.WalkDownLeft)
+    local last_anim = player.anim_state.last_anim
+    return (last_anim == g_anims.IdleLeft or
+            last_anim == g_anims.WalkLeft or
+            last_anim == g_anims.IdleUpLeft or
+            last_anim == g_anims.WalkUpLeft or
+            last_anim == g_anims.IdleDownLeft or
+            last_anim == g_anims.WalkDownLeft)
 end
 
 function get_dig_anim_for_player(player)
@@ -579,7 +579,7 @@ function draw_game()
     -- dbg_display_anim_state(g_player, { x = 0, y = 60 }, g_anims)
 
     -- uncomment to display colliders on top of everything for debugging
-    -- dbg_display_colliders()
+    -- dbg_display_colliders(g_player, g_map, g_bombs)
 
     --
     -- Draw all UI unaffected by the camera
@@ -658,10 +658,7 @@ function draw_game_over()
             end
         end
 
-        --
-
-        game_over_text = sub(game_over_text, start_char, end_char)
-        print(game_over_text, 10, 10, Colors.White)
+        print(sub(game_over_text, start_char, end_char), 10, 10, Colors.White)
 
         -- draw the page UI
         draw_page_ui(g_player)
@@ -696,7 +693,7 @@ function center_text(rect, text)
     return { x = text_start_x, y = text_start_y + 1 }
 end
 
-function draw_hint_arrow(pos_center, hint)
+function draw_hint_arrow(pos, hint)
     local frame = nil
     local flip_x = nil
     local flip_y = nil
@@ -735,25 +732,23 @@ function draw_hint_arrow(pos_center, hint)
         flip_y = false
     end
 
-    spr_centered(frame, pos_center.x, pos_center.y, 1, 1, flip_x, flip_y)
+    spr_centered(frame, pos.x, pos.y, 1, 1, flip_x, flip_y)
 end
 
-function draw_bomb_item(pos_center)
-    spr_centered(74, pos_center.x, pos_center.y, 1, 1)
+function draw_bomb_item(pos)
+    spr_centered(74, pos.x, pos.y, 1, 1)
 end
 
-function draw_page_item(pos_center, sprite)
-    spr_centered(sprite, pos_center.x, pos_center.y, 1, 1)
+function draw_page_item(pos, sprite)
+    spr_centered(sprite, pos.x, pos.y, 1, 1)
 end
 
-function draw_book(pos_center, on_altar)
+function draw_book(pos, on_altar)
+    local y_ofs = 0 -- book on floor
     if on_altar then
-        -- draw the book on the altar
-        spr_centered(72, pos_center.x, pos_center.y - 4, 1, 1)
-    else
-        -- draw just the book on the floor
-        spr_centered(72, pos_center.x, pos_center.y, 1, 1)
+        y_ofs = 4 -- book on altar
     end
+    spr_centered(72, pos.x, pos.y - y_ofs, 1, 1)
 end
 
 function set_banner(text, banner_type, banner_time)
@@ -812,14 +807,13 @@ function sspr_centered(frame, x, y, tile_width, tile_height, scale, flip_x, flip
 end
 
 
-function generate_maps(num_maps)
+function gen_maps(num_maps)
     local maps = {}
 
     for i=1,(num_maps - 1) do
-        -- the first level has map size 2
-        -- the largest map is size MAX_TILE_LINE()
-        local map_size_for_level = min((i + 1), MAX_TILE_LINE())
-        add(maps, generate_empty_level(i, map_size_for_level))
+        -- the levels increase in size from 2 -> MAX_TILE_LINE()
+        local map_size = min((i + 1), MAX_TILE_LINE())
+        add(maps, gen_empty_level(i, map_size))
     end
 
     -- Place the start and end tile on each map FIRST (we have to have these tiles. The rest aren't guaranteed to be
@@ -834,7 +828,7 @@ function generate_maps(num_maps)
         map.cells[map.finish_cell_idx].tile = make_tile(false, TileType.FloorExit)
     end
 
-    -- generate the trap cells in each map
+    -- set the trap cells in each map
     -- On each map, %30 of the tiles rounded down have traps
     for map in all(maps) do
         local trap_cell_cnt = flr(map.iso_width * map.iso_width * 0.30)
@@ -844,7 +838,7 @@ function generate_maps(num_maps)
         end
     end
 
-    -- generate the bomb item cells
+    -- set the bomb item cells
     -- There are a total of 10 bombs across the whole game
     local bomb_cell_cnt = 10
     local bomb_cells = select_random_empty_tiles(maps, bomb_cell_cnt)
@@ -852,7 +846,7 @@ function generate_maps(num_maps)
         bomb_cell.map.cells[bomb_cell.idx].tile = make_tile(false, TileType.BombItem)
     end
 
-    -- generate the page item cells
+    -- set the page item cells
     local page_fragments = { 172, 173, 188, 189 }
     local next_page_frag_idx = 0
 
@@ -900,13 +894,13 @@ function generate_maps(num_maps)
         end
     end
 
-    -- Last but not least, we'll generate the last level. This
-    -- level is generated specially since it doesn't follow the rules of the previous maps.
-    -- It's just the single goal item in the middle of an empty layer
-    local final_map = generate_empty_level(num_maps, MAX_TILE_LINE())
+    -- Last but not least, we'll create the last level. This level has unique structure and is created last
+    -- It's just the single goal item in the middle of an empty layer.
+    local final_map = gen_empty_level(num_maps, MAX_TILE_LINE())
     -- set the final level's entry
     local final_map_start_iso_idx = select_random_empty_tile_idx_from_map(final_map)
     final_map.cells[final_map_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
+    -- FIXME: maybe the altar should always be in the middle
     -- set the altar point
     local altar_cell_idx = select_random_empty_tile_idx_from_map(final_map)
     final_map.cells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
@@ -920,36 +914,26 @@ function generate_maps(num_maps)
     add(maps, final_map)
 
     -- uncomment this to make all tiles visible at start
-    -- for map in all(maps) do
-    --     for cell in all(map.cells) do
-    --         cell.tile.visible = true
-    --     end
-    -- end
+    -- dbg_set_tiles_visible(maps, nil)
 
     -- uncomment this to make all exit tiles and page tiles visible at start
-    -- for map in all(maps) do
-    --     for cell in all(map.cells) do
-    --         if cell.tile.type == TileType.PageItem then
-    --             cell.tile.visible = true
-    --         elseif cell.tile.type == TileType.FloorExit then
-    --             cell.tile.visible = true
-    --         end
-    --     end
-    -- end
+    -- dbg_set_tiles_visible(maps, { TileType.PageItem, TileType.FloorExit })
 
     return maps
 end
 
-function generate_empty_level(level_id, map_iso_width)
-    -- generate a new map
+function gen_empty_level(level_id, map_iso_width)
+    -- create a new map
     local next_map = {}
     next_map.level_id = level_id
     next_map.iso_width = map_iso_width
-
-    -- generate the isomap. initialize all at the start to empty
     next_map.cells = {}
-    -- add an two extra rows to each side of the map so we can wrap the map with fall tiles
-    local row_cnt = isomap_row_cnt(next_map) + 4
+
+    -- wrap the map with a ring of invisible fall tiles. adds 2 rows to each side
+    local visible_row_cnt = next_map.iso_width * 2 - 1
+    local row_cnt = visible_row_cnt + 4
+
+    -- initialize all the border cells as fall tiles and all the interior cells as empty
     local idx = 1
     for row = 1,row_cnt do
         local midpoint_row = flr((row_cnt + 1) / 2)
@@ -1092,61 +1076,60 @@ end
 function move_player(input)
     -- when traveling diagnonally, multiply by the factor sqrt(0.5) to avoid traveling further by going diagonally
     local sqrt_half = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
-    local movement_x = 0
-    local movement_y = 0
-    if g_input.btn_left then
-        if g_input.btn_up then
-            movement_x = -2 * sqrt_half
-            movement_y = -1 * sqrt_half
-        elseif g_input.btn_down then
-            movement_x = -2 * sqrt_half
-            movement_y = sqrt_half
+    local dx = 0
+    local dy = 0
+    if input.btn_left then
+        if input.btn_up then
+            dx = -2 * sqrt_half
+            dy = -1 * sqrt_half
+        elseif input.btn_down then
+            dx = -2 * sqrt_half
+            dy = sqrt_half
         else
-            movement_x = -2
-            movement_y = 0
+            dx = -2
+            dy = 0
         end
-    elseif g_input.btn_right then
-        if g_input.btn_up then
-            movement_x = 2 * sqrt_half
-            movement_y = -1 * sqrt_half
-        elseif g_input.btn_down then
-            movement_x = 2 * sqrt_half
-            movement_y = sqrt_half
+    elseif input.btn_right then
+        if input.btn_up then
+            dx = 2 * sqrt_half
+            dy = -1 * sqrt_half
+        elseif input.btn_down then
+            dx = 2 * sqrt_half
+            dy = sqrt_half
         else
-            movement_x = 2
-            movement_y = 0
+            dx = 2
+            dy = 0
         end
-    elseif g_input.btn_up then
-        movement_x = 0
-        movement_y = -1
-    elseif g_input.btn_down then
-        movement_x = 0
-        movement_y = 1
+    elseif input.btn_up then
+        dx = 0
+        dy = -1
+    elseif input.btn_down then
+        dx = 0
+        dy = 1
     else
         return
     end
 
-    local player_speed = 1.0 -- an arbitrary, tweakable speed factor to hand tune movement speed to feel good
-    movement_x *= player_speed
-    movement_y *= player_speed
+    local player_spd = 1.0 -- an arbitrary speed factor to hand tune movement speed to feel good
+    dx *= player_spd
+    dy *= player_spd
 
     -- copy the old position in case we need to roll back
     local old_player_pos = copy_vec2(g_player.pos)
 
-    -- move the player, check if they've moved onto a fall tile
+    -- test all potential movements and use the first one that doesn't put us on a fall tile
     local move_candidates = {}
-    add(move_candidates, { x = movement_x, y = movement_y })
-    if movement_x != 0 then
-        add(move_candidates, { x = movement_x, y = 0 })
+    add(move_candidates, { x = dx, y = dy })
+    if dx != 0 then
+        add(move_candidates, { x = dx, y = 0 })
     end
-    if movement_y != 0 then
-        add(move_candidates, { x = 0, y = movement_y })
+    if dy != 0 then
+        add(move_candidates, { x = 0, y = dy })
     end
 
     for move in all(move_candidates) do
         g_player.pos = add_vec2(old_player_pos, move)
 
-        -- check if we've standing on any fall tiles and if so, rollback the movement
         local cells = get_cells_under_actor(g_map, g_player)
         local valid_move = true
         for cell in all(cells) do
@@ -1161,51 +1144,51 @@ function move_player(input)
         end
     end
 
-    -- rollback
+    -- no movements worked, rollback
     g_player.pos = old_player_pos
 end
 
 function animate_player(input)
     local anim = nil
-    if g_input.btn_left then
-        if g_input.btn_up then
+    if input.btn_left then
+        if input.btn_up then
             anim = g_anims.WalkUpLeft
-        elseif g_input.btn_down then
+        elseif input.btn_down then
             anim = g_anims.WalkDownLeft
         else
             anim = g_anims.WalkLeft
         end
-    elseif g_input.btn_right then
-        if g_input.btn_up then
+    elseif input.btn_right then
+        if input.btn_up then
             anim = g_anims.WalkUpRight
-        elseif g_input.btn_down then
+        elseif input.btn_down then
             anim = g_anims.WalkDownRight
         else
             anim = g_anims.WalkRight
         end
-    elseif g_input.btn_up then
+    elseif input.btn_up then
         anim = g_anims.WalkUp
-    elseif g_input.btn_down then
+    elseif input.btn_down then
         anim = g_anims.WalkDown
     else
-        if g_player.anim_state.last_flow == g_anims.WalkLeft then
+        if g_player.anim_state.last_anim == g_anims.WalkLeft then
             anim = g_anims.IdleLeft
-        elseif g_player.anim_state.last_flow == g_anims.WalkRight then
+        elseif g_player.anim_state.last_anim == g_anims.WalkRight then
             anim = g_anims.IdleRight
-        elseif g_player.anim_state.last_flow == g_anims.WalkUp then
+        elseif g_player.anim_state.last_anim == g_anims.WalkUp then
             anim = g_anims.IdleUp
-        elseif g_player.anim_state.last_flow == g_anims.WalkDown then
+        elseif g_player.anim_state.last_anim == g_anims.WalkDown then
             anim = g_anims.IdleDown
-        elseif g_player.anim_state.last_flow == g_anims.WalkUpLeft then
+        elseif g_player.anim_state.last_anim == g_anims.WalkUpLeft then
             anim = g_anims.IdleUpLeft
-        elseif g_player.anim_state.last_flow == g_anims.WalkUpRight then
+        elseif g_player.anim_state.last_anim == g_anims.WalkUpRight then
             anim = g_anims.IdleUpRight
-        elseif g_player.anim_state.last_flow == g_anims.WalkDownLeft then
+        elseif g_player.anim_state.last_anim == g_anims.WalkDownLeft then
             anim = g_anims.IdleDownLeft
-        elseif g_player.anim_state.last_flow == g_anims.WalkDownRight then
+        elseif g_player.anim_state.last_anim == g_anims.WalkDownRight then
             anim = g_anims.IdleDownRight
         else
-            anim = g_player.anim_state.last_flow
+            anim = g_player.anim_state.last_anim
         end
     end
 
@@ -1252,8 +1235,8 @@ function is_cell_under_actor(cell, actor)
     -- divide up an iso-tile into 3 rect colliders
     local iso_sub_colliders = {
         { width = 12, height = 12 },
-        { width = 18, height = 9 },
-        { width = 26, height = 5 },
+        { width = 18, height =  9 },
+        { width = 26, height =  5 },
     }
 
     -- setup a simple rect-collider for the actor wrapping their circle collider
@@ -1266,11 +1249,9 @@ function is_cell_under_actor(cell, actor)
         height = (actor.collider.radius + actor.collider.radius),
     }
 
-    local cell_pos_x = cell.pos.x
-    local cell_pos_y = cell.pos.y
     for sub_collider in all(iso_sub_colliders) do
         -- center the subcollider in the iso cell
-        sub_collider.pos = { x = cell_pos_x - (sub_collider.width/2), y = cell_pos_y - (sub_collider.height/2) }
+        sub_collider.pos = { x = cell.pos.x - (sub_collider.width/2), y = cell.pos.y - (sub_collider.height/2) }
         if rect_colliders_overlap(actor_rect_collider, sub_collider) then
             return true
         end
@@ -1299,23 +1280,23 @@ function highlight_cell(cell)
     local cell_pos_y = cell.pos.y
     -- N.B. for some reason, I need to subtract '1' from each of the y values. I haven't yet rationalized why
     -- the off-by-one pixel shift is needed. I'll figure it out later.
-    local line_points = {
+    local corners = {
         { x = cell_pos_x - ISO_TILE_WIDTH()/2, y = cell_pos_y - 1 },
         { x = cell_pos_x,                      y = cell_pos_y - 1 - ISO_TILE_HEIGHT()/2 },
         { x = cell_pos_x + ISO_TILE_WIDTH()/2, y = cell_pos_y - 1},
         { x = cell_pos_x,                      y = cell_pos_y - 1+ ISO_TILE_HEIGHT()/2 },
     }
 
-    line(line_points[1].x, line_points[1].y, line_points[2].x, line_points[2].y, Colors.White)
-    line(line_points[2].x, line_points[2].y, line_points[3].x, line_points[3].y, Colors.White)
-    line(line_points[3].x, line_points[3].y, line_points[4].x, line_points[4].y, Colors.White)
-    line(line_points[4].x, line_points[4].y, line_points[1].x, line_points[1].y, Colors.White)
+    line(corners[1].x, corners[1].y, corners[2].x, corners[2].y, Colors.White)
+    line(corners[2].x, corners[2].y, corners[3].x, corners[3].y, Colors.White)
+    line(corners[3].x, corners[3].y, corners[4].x, corners[4].y, Colors.White)
+    line(corners[4].x, corners[4].y, corners[1].x, corners[1].y, Colors.White)
 end
 
 function new_bomb(pos, on_explosion_start)
     local self = {
         state = "Countdown",
-        countdown_anim = g_anims.BombCountdown,
+        countdown_anim = g_anims.BombFlash,
         explosion_timer = make_ingame_timer(32),
         explosions = {},
         active_explosions = {},
@@ -1327,32 +1308,32 @@ function new_bomb(pos, on_explosion_start)
         return { x = pos.x - width/2, y = pos.y - height/2 }
     end
 
-    function generate_explosions(pos)
+    function gen_explosions(pos)
         local sqrt_half = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
         local up_right = { x =  2 * sqrt_half, y = -1 * sqrt_half }
         local up_left = { x = -2 * sqrt_half, y = -1 * sqrt_half }
         local down_right = { x =  2 * sqrt_half, y =  1 * sqrt_half }
         local down_left = { x = -2 * sqrt_half, y =  1 * sqrt_half }
 
-        function generate_explosion(frame, pos)
+        function gen_explosion(frame, pos)
             return { frame = frame, pos = pos, collider = { radius = 3 } }
         end
 
         local explosion_scale = 10
         return {
-            generate_explosion(  0, copy_vec2(pos)),       -- center
-            generate_explosion( -8, add_vec2(pos, scale_vec2(   up_left, 1 * explosion_scale))), -- up left 1
-            generate_explosion(-16, add_vec2(pos, scale_vec2(   up_left, 2 * explosion_scale))), -- up left 2
-            generate_explosion(-24, add_vec2(pos, scale_vec2(   up_left, 3 * explosion_scale))), -- up left 3
-            generate_explosion( -8, add_vec2(pos, scale_vec2(  up_right, 1 * explosion_scale))), -- up right 1
-            generate_explosion(-16, add_vec2(pos, scale_vec2(  up_right, 2 * explosion_scale))), -- up right 2
-            generate_explosion(-24, add_vec2(pos, scale_vec2(  up_right, 3 * explosion_scale))), -- up right 3
-            generate_explosion( -8, add_vec2(pos, scale_vec2( down_left, 1 * explosion_scale))), -- down left 1
-            generate_explosion(-16, add_vec2(pos, scale_vec2( down_left, 2 * explosion_scale))), -- down left 2
-            generate_explosion(-24, add_vec2(pos, scale_vec2( down_left, 3 * explosion_scale))), -- down left 3
-            generate_explosion( -8, add_vec2(pos, scale_vec2(down_right, 1 * explosion_scale))), -- down right 1
-            generate_explosion(-16, add_vec2(pos, scale_vec2(down_right, 2 * explosion_scale))), -- down right 2
-            generate_explosion(-24, add_vec2(pos, scale_vec2(down_right, 3 * explosion_scale))), -- down right 3
+            gen_explosion(  0, copy_vec2(pos)),       -- center
+            gen_explosion( -8, add_vec2(pos, scale_vec2(   up_left, 1 * explosion_scale))), -- up left 1
+            gen_explosion(-16, add_vec2(pos, scale_vec2(   up_left, 2 * explosion_scale))), -- up left 2
+            gen_explosion(-24, add_vec2(pos, scale_vec2(   up_left, 3 * explosion_scale))), -- up left 3
+            gen_explosion( -8, add_vec2(pos, scale_vec2(  up_right, 1 * explosion_scale))), -- up right 1
+            gen_explosion(-16, add_vec2(pos, scale_vec2(  up_right, 2 * explosion_scale))), -- up right 2
+            gen_explosion(-24, add_vec2(pos, scale_vec2(  up_right, 3 * explosion_scale))), -- up right 3
+            gen_explosion( -8, add_vec2(pos, scale_vec2( down_left, 1 * explosion_scale))), -- down left 1
+            gen_explosion(-16, add_vec2(pos, scale_vec2( down_left, 2 * explosion_scale))), -- down left 2
+            gen_explosion(-24, add_vec2(pos, scale_vec2( down_left, 3 * explosion_scale))), -- down left 3
+            gen_explosion( -8, add_vec2(pos, scale_vec2(down_right, 1 * explosion_scale))), -- down right 1
+            gen_explosion(-16, add_vec2(pos, scale_vec2(down_right, 2 * explosion_scale))), -- down right 2
+            gen_explosion(-24, add_vec2(pos, scale_vec2(down_right, 3 * explosion_scale))), -- down right 3
         }
     end
 
@@ -1361,7 +1342,7 @@ function new_bomb(pos, on_explosion_start)
             update_anim(self, self.countdown_anim)
             if self.anim_state.loop > 0 then
                 self.state = "Explode"
-                self.explosions = generate_explosions(self.pos)
+                self.explosions = gen_explosions(self.pos)
             end
         elseif self.state == "Explode" then
             self.explosion_timer.update()
@@ -1465,11 +1446,11 @@ function split_text(text)
     return split_text
 end
 
-function generate_lose_text()
+function gen_lose_text()
     return "you were unable to make\nyour way to the bottom\nof the grave in time.\n\nyour family's most\ncherished heirloom is\nlost. gone forever.\n\nthis is unacceptable.\nyou'll have to try again.\n\nx/c - to reset"
 end
 
-function generate_win_text(collected_page_count, total_page_count)
+function gen_win_text(collected_page_count, total_page_count)
     local text = "you made it back with the book. a brown book stitched together with strong thread and thick brown pages. a family heirloom."
     if collected_page_count == 0 then
         text = text .. " opening the book you realize several pages are missing. maybe they're back down in the grave. at least you saved the book. in another life, maybe you could find those pages.\n\nx/c - to reset"
@@ -1495,10 +1476,6 @@ function generate_win_text(collected_page_count, total_page_count)
     return split_text(text)
 end
 
-function isomap_row_cnt(map)
-    return map.iso_width * 2 - 1
-end
-
 function copy_vec2(v)
     return { x = v.x, y = v.y }
 end
@@ -1521,9 +1498,9 @@ function handle_game_over(game_won)
         timer_scroll = 0,
     }
     if game_won then
-        g_game_over_state.game_over_text = generate_win_text(#g_player.collected_pages, TOTAL_PAGE_COUNT())
+        g_game_over_state.game_over_text = gen_win_text(#g_player.collected_pages, TOTAL_PAGE_COUNT())
     else
-        g_game_over_state.game_over_text = generate_lose_text()
+        g_game_over_state.game_over_text = gen_lose_text()
     end
     g_game_timer_ui.set_blinking(true)
     g_game_phase = GamePhase.GameOver

@@ -7,7 +7,7 @@
 -- Thanks scathe!
 --
 
-function create_anim_flow(frames, speed, tile_size, flip)
+function create_anim(frames, speed, tile_size, flip)
     return {
         frames = frames,
         num_tiles = count(frames),
@@ -27,31 +27,32 @@ function reset_anim(obj)
     obj.anim_state.loop = 0
 end
 
-function update_anim(obj, anim_flow)
+function update_anim(obj, anim)
     obj.anim_state = obj.anim_state or new_anim_state()
     local anim_state = obj.anim_state
 
     anim_state.a_ct += 1
 
-    local move_to_next_frame = anim_state.a_ct % (30 / anim_flow.speed) == 0
+    local move_to_next_frame = anim_state.a_ct % (30 / anim.speed) == 0
     if move_to_next_frame then
         anim_state.a_st += 1
-        if anim_state.a_st >= anim_flow.num_tiles then
+        if anim_state.a_st >= anim.num_tiles then
             anim_state.a_st = 0
             anim_state.loop += 1
         end
-    elseif anim_state.a_st >= anim_flow.num_tiles then
+    elseif anim_state.a_st >= anim.num_tiles then
         anim_state.a_st = 0
     end
 
-    local frame = anim_flow.frames[anim_state.a_st + 1]
+    local frame = anim.frames[anim_state.a_st + 1]
 
     anim_state.a_fr = frame
-    anim_state.flip = anim_flow.flip
-    anim_state.tile_size = anim_flow.tile_size
-    anim_state.last_flow = anim_flow
+    anim_state.flip = anim.flip
+    anim_state.tile_size = anim.tile_size
+    anim_state.last_anim = anim
 end
 
-function draw_anim(obj, sprite_pos)
-    spr(obj.anim_state.a_fr, sprite_pos.x, sprite_pos.y, obj.anim_state.tile_size, obj.anim_state.tile_size, obj.anim_state.flip)
+function draw_anim(obj, spr_pos)
+    local anim_state = obj.anim_state
+    spr(anim_state.a_fr, spr_pos.x, spr_pos.y, anim_state.tile_size, anim_state.tile_size, anim_state.flip)
 end

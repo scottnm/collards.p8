@@ -30,11 +30,6 @@ function rnd_incrange(lower, upper)
     return flr(rnd(upper - lower)) + lower
 end
 
--- generate a random int from within a range inclusive
-function rnd_incrange(lower, upper)
-    return flr(rnd(upper - lower)) + lower
-end
-
 -- clamp a value within a range inclusively
 function clamp(lower, value, upper)
     return mid(lower, value, upper)
