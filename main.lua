@@ -116,6 +116,8 @@ function reset()
 
     g_maps = gen_maps(10)
     move_to_level(1, TileType.FloorEntry)
+
+    g_detector = 0
 end
 
 function _update()
@@ -600,6 +602,9 @@ function draw_game()
         end
     end
 
+    -- draw the metal detector
+    draw_detector_ui(g_detector)
+
     -- draw the bomb counter UI
     draw_bomb_item({ x = 4, y = 111 })
     print(":"..g_player.bomb_count, 8, 110, Colors.White)
@@ -663,6 +668,10 @@ function draw_game_over()
         -- draw the page UI
         draw_page_ui(g_player)
     end
+end
+
+function draw_detector_ui(detector)
+    rect(0, 20, 10, 70, Colors.White)
 end
 
 function draw_page_ui(player)
