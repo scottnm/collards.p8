@@ -118,7 +118,7 @@ function reset()
     move_to_level(1, TileType.FloorEntry)
 
     -- detector values move between 0 and 1
-    g_detector = { cursor_val = 0.5, curr_val = 0.5 }
+    g_detector = { cursor_val = 0.5, cursor_target = 0.5 }
 end
 
 function _update()
@@ -156,6 +156,9 @@ function main_game_update(input)
 
     -- update our in-game accelerated timer UI
     g_game_timer_ui.update(g_maingame_tick_count)
+
+    -- update the ui detector cursor
+    update_detector(g_detector)
 
     -- handle input blocking animation states
     local block_input = false
@@ -668,6 +671,17 @@ function draw_game_over()
 
         -- draw the page UI
         draw_page_ui(g_player)
+    end
+end
+
+function update_detector(detector)
+    g_cursor_speed = g_cursor_speed or 0.03
+
+    detector.cursor_val = clamp(0, detector.cursor_val + g_cursor_speed, 1)
+
+    if (detector.cursor_val >= 1 and g_cursor_speed > 0) or
+       (detector.cursor_val <= 0 and g_cursor_speed < 0) then
+        g_cursor_speed *= -1
     end
 end
 
