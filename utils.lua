@@ -103,3 +103,10 @@ end
 function sqr_dist(a, b)
     return sqr(a.x - b.x) + sqr(a.y - b.y)
 end
+
+function midpoint(p1, p2)
+    return {
+        x = (p1.x - p2.x)/2 + p2.x,
+        y = (p1.y - p2.y)/2 + p2.y,
+    }
+end

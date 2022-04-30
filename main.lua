@@ -585,11 +585,17 @@ function draw_game()
     -- draw interference values
     for cell in all(g_map.cells) do
         if cell.interference != nil then
-            print("i:"..cell.interference, cell.pos.x, cell.pos.y, Colors.White)
+            local i = flr(cell.interference * 100)/100
+            line(cell.pos.x, cell.pos.y, g_player.pos.x, g_player.pos.y, Colors.White)
+            mp = cell.pos
+            rectfill(mp.x, mp.y, mp.x + 15, mp.y + 6, Colors.Black)
+            print(""..i, mp.x, mp.y, Colors.White)
         end
     end
     g_player.interference = g_player.interference or 0
-    print("i:"..g_player.interference, g_player.pos.x, g_player.pos.y, Colors.White)
+    local pi = flr(g_player.interference * 100)/100
+    rectfill(g_player.pos.x, g_player.pos.y, g_player.pos.x + 15, g_player.pos.y+6, Colors.Black)
+    print(""..pi, g_player.pos.x, g_player.pos.y, Colors.White)
 
     -- uncomment to display anim state for debugging
     -- dbg_display_anim_state(g_player, { x = 0, y = 60 }, g_anims)
@@ -702,7 +708,7 @@ function update_detector(detector)
             local ttype = cell.tile.type
             if ttype == TileType.BombItem or ttype == TileType.PageItem then
                 local item_sqr_dist = sqr_dist(g_player.pos, cell.pos);
-                local item_interference = max(0, 1 - sqrt((item_sqr_dist/sqr(64))))
+                local item_interference = max(0, 1 - sqrt((item_sqr_dist/sqr(48))))
                 interference += item_interference
 
                 -- FIXME: tmp debugging utility
