@@ -117,7 +117,8 @@ function reset()
     g_maps = gen_maps(10)
     move_to_level(1, TileType.FloorEntry)
 
-    g_detector = 0
+    -- detector values move between 0 and 1
+    g_detector = { cursor_val = 0.5, curr_val = 0.5 }
 end
 
 function _update()
@@ -671,7 +672,14 @@ function draw_game_over()
 end
 
 function draw_detector_ui(detector)
-    rect(0, 20, 10, 70, Colors.White)
+    g_dui = { x = 0, y = 20, w = 10, h = 50 }
+
+    rect(g_dui.x, g_dui.y, g_dui.x + g_dui.w, g_dui.y + g_dui.h, Colors.White)
+
+    -- cursor_val is a ratio between 0->1 of how far up the detector bar the cursor should be
+    -- invert the ratio since y values grow downwards
+    local cursor_y = g_dui.y + (g_dui.h * (1 - detector.cursor_val))
+    line(g_dui.x, cursor_y, g_dui.x + (g_dui.w * .75), cursor_y)
 end
 
 function draw_page_ui(player)
