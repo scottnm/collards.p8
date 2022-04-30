@@ -158,7 +158,7 @@ function main_game_update(input)
     g_game_timer_ui.update(g_maingame_tick_count)
 
     -- update the ui detector cursor
-    update_detector(g_detector)
+    update_detector(g_detector, input)
 
     -- handle input blocking animation states
     local block_input = false
@@ -674,14 +674,19 @@ function draw_game_over()
     end
 end
 
-function update_detector(detector)
-    g_cursor_speed = g_cursor_speed or 0.03
+function update_detector(detector, input)
+    g_cursor_speed = 0.03
 
-    detector.cursor_val = clamp(0, detector.cursor_val + g_cursor_speed, 1)
+    -- FIXME: input param is temporary just so I can prototype cursor movement
+    if input.btn_o and input.btn_o_change then
+        detector.cursor_target = rnd(1)
+        printh("new cursor target = "..detector.cursor_target)
+    end
 
-    if (detector.cursor_val >= 1 and g_cursor_speed > 0) or
-       (detector.cursor_val <= 0 and g_cursor_speed < 0) then
-        g_cursor_speed *= -1
+    if detector.cursor_val > detector.cursor_target then
+        detector.cursor_val = max(detector.cursor_val - g_cursor_speed, detector.cursor_target)
+    else
+        detector.cursor_val = min(detector.cursor_val + g_cursor_speed, detector.cursor_target)
     end
 end
 
