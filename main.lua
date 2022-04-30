@@ -118,7 +118,7 @@ function reset()
     move_to_level(1, TileType.FloorEntry)
 
     -- detector values move between 0 and 1
-    g_detector = { cursor_val = 0.5, cursor_target = 0.5 }
+    g_detector = { cursor_val = 0.5, cursor_target = 0.5, next_scan = 0 }
 end
 
 function _update()
@@ -158,7 +158,7 @@ function main_game_update(input)
     g_game_timer_ui.update(g_maingame_tick_count)
 
     -- update the ui detector cursor
-    update_detector(g_detector, input)
+    update_detector(g_detector)
 
     -- handle input blocking animation states
     local block_input = false
@@ -674,13 +674,33 @@ function draw_game_over()
     end
 end
 
-function update_detector(detector, input)
+function update_detector(detector)
     g_cursor_speed = 0.03
 
-    -- FIXME: input param is temporary just so I can prototype cursor movement
-    if input.btn_o and input.btn_o_change then
-        detector.cursor_target = rnd(1)
-        printh("new cursor target = "..detector.cursor_target)
+    local do_proximity_scan = false
+    detector.next_scan -= 1
+    if detector.next_scan <= 0 then
+        do_proximity_scan = true
+        detector.next_scan = 30
+    end
+
+    -- if we need to do a proximity scan, calculate the
+    if do_proximity_scan then
+        -- FIXME: consider factoring lava into this if this makes things too easy
+        local interference = 0
+        for cell in all(g_map.cells) do
+            local ttype = cell.tile.type
+            if ttype == TileType.BombItem or ttype == TileType.PageItem then
+                local item_sqr_dist = sqr_dist(g_player.pos, cell.pos);
+                local item_interference = max(0, 1 - (item_sqr_dist/sqr(64)))
+                interference += item_interference
+            end
+        end
+
+        local clamped_interference = min(1, interference)
+        printh("i: "..interference.."\tci: "..clamped_interference)
+        -- FIXME: enable after checking
+        -- detector.cursor_target = interference
     end
 
     if detector.cursor_val > detector.cursor_target then
@@ -950,7 +970,7 @@ function gen_maps(num_maps)
     add(maps, final_map)
 
     -- uncomment this to make all tiles visible at start
-    -- dbg_set_tiles_visible(maps, nil)
+    dbg_set_tiles_visible(maps, nil)
 
     -- uncomment this to make all exit tiles and page tiles visible at start
     -- dbg_set_tiles_visible(maps, { TileType.PageItem, TileType.FloorExit })
