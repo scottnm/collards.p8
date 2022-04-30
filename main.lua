@@ -581,6 +581,16 @@ function draw_game()
         bomb.draw()
     end
 
+    -- FIXME: tmp!!!!
+    -- draw interference values
+    for cell in all(g_map.cells) do
+        if cell.interference != nil then
+            print("i:"..cell.interference, cell.pos.x, cell.pos.y, Colors.White)
+        end
+    end
+    g_player.interference = g_player.interference or 0
+    print("i:"..g_player.interference, g_player.pos.x, g_player.pos.y, Colors.White)
+
     -- uncomment to display anim state for debugging
     -- dbg_display_anim_state(g_player, { x = 0, y = 60 }, g_anims)
 
@@ -692,12 +702,16 @@ function update_detector(detector)
             local ttype = cell.tile.type
             if ttype == TileType.BombItem or ttype == TileType.PageItem then
                 local item_sqr_dist = sqr_dist(g_player.pos, cell.pos);
-                local item_interference = max(0, 1 - (item_sqr_dist/sqr(64)))
+                local item_interference = max(0, 1 - sqrt((item_sqr_dist/sqr(64))))
                 interference += item_interference
+
+                -- FIXME: tmp debugging utility
+                cell.interference = item_interference
             end
         end
 
         local clamped_interference = min(1, interference)
+        g_player.interference = clamped_interference
         printh("i: "..interference.."\tci: "..clamped_interference)
         -- FIXME: enable after checking
         -- detector.cursor_target = interference
