@@ -583,19 +583,19 @@ function draw_game()
 
     -- FIXME: tmp!!!!
     -- draw interference values
-    for cell in all(g_map.cells) do
-        if cell.interference != nil then
-            local i = flr(cell.interference * 100)/100
-            line(cell.pos.x, cell.pos.y, g_player.pos.x, g_player.pos.y, Colors.White)
-            mp = cell.pos
-            rectfill(mp.x, mp.y, mp.x + 15, mp.y + 6, Colors.Black)
-            print(""..i, mp.x, mp.y, Colors.White)
-        end
-    end
-    g_player.interference = g_player.interference or 0
-    local pi = flr(g_player.interference * 100)/100
-    rectfill(g_player.pos.x, g_player.pos.y, g_player.pos.x + 15, g_player.pos.y+6, Colors.Black)
-    print(""..pi, g_player.pos.x, g_player.pos.y, Colors.White)
+    -- for cell in all(g_map.cells) do
+    --     if cell.interference != nil then
+    --         local i = flr(cell.interference * 100)/100
+    --         line(cell.pos.x, cell.pos.y, g_player.pos.x, g_player.pos.y, Colors.White)
+    --         mp = cell.pos
+    --         rectfill(mp.x, mp.y, mp.x + 15, mp.y + 6, Colors.Black)
+    --         print(""..i, mp.x, mp.y, Colors.White)
+    --     end
+    -- end
+    -- g_player.interference = g_player.interference or 0
+    -- local pi = flr(g_player.interference * 100)/100
+    -- rectfill(g_player.pos.x, g_player.pos.y, g_player.pos.x + 15, g_player.pos.y+6, Colors.Black)
+    -- print(""..pi, g_player.pos.x, g_player.pos.y, Colors.White)
 
     -- uncomment to display anim state for debugging
     -- dbg_display_anim_state(g_player, { x = 0, y = 60 }, g_anims)
@@ -697,28 +697,23 @@ function update_detector(detector)
     detector.next_scan -= 1
     if detector.next_scan <= 0 then
         do_proximity_scan = true
-        detector.next_scan = 30
+        detector.next_scan = 15
     end
 
     -- if we need to do a proximity scan, calculate the
     if do_proximity_scan then
         -- FIXME: consider factoring lava into this if this makes things too easy
-        local interference = 0
+        local max_interference = 0
         for cell in all(g_map.cells) do
             local ttype = cell.tile.type
             if ttype == TileType.BombItem or ttype == TileType.PageItem then
-                local item_sqr_dist = sqr_dist(g_player.pos, cell.pos);
-                local item_interference = max(0, 1 - sqrt((item_sqr_dist/sqr(48))))
-                interference += item_interference
-
-                -- FIXME: tmp debugging utility
-                cell.interference = item_interference
+                local item_dist = sqrt(sqr_dist(g_player.pos, cell.pos));
+                local item_interference = clamp(0, 1 - (item_dist/48), 1)
+                max_interference = max(max_interference, item_interference)
             end
         end
+        printh("i:"..max_interference)
 
-        local clamped_interference = min(1, interference)
-        g_player.interference = clamped_interference
-        printh("i: "..interference.."\tci: "..clamped_interference)
         -- FIXME: enable after checking
         -- detector.cursor_target = interference
     end
