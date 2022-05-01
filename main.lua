@@ -1,4 +1,3 @@
--- FIXME: hit game over bug
 -- main.lua - main game logic
 
 GamePhase = {
@@ -243,13 +242,6 @@ function main_game_update(input)
 
     if g_maingame_tick_count >= MAINGAME_TIME_LIMIT() then
         handle_game_over(false)
-        g_game_over_state = {
-            substate = "scroll_timer",
-            timer_scroll = 0,
-        }
-        g_game_phase = GamePhase.GameOver
-        g_game_timer_ui.set_blinking(true)
-        music(-1, 1000)
     end
 end
 
@@ -1569,6 +1561,7 @@ function handle_game_over(game_won)
         substate = "scroll_timer",
         timer_scroll = 0,
     }
+
     if game_won then
         g_game_over_state.game_over_text = gen_win_text(#g_player.collected_pages, TOTAL_PAGE_COUNT())
     else
