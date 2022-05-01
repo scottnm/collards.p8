@@ -1,5 +1,6 @@
 -- dbg.lua - dbg helpers
 
+-- e.g. dbg_display_frame_stats({ x = 80, y = 80 })
 function dbg_display_frame_stats(pos)
     print("mem:  "..  stat(0), pos.x, pos.y + 00, Colors.White)
     print("cpu:  "..  stat(1), pos.x, pos.y + 10, Colors.White)
@@ -7,6 +8,7 @@ function dbg_display_frame_stats(pos)
     print("fps(a): "..stat(7), pos.x, pos.y + 30, Colors.White)
 end
 
+-- e.g. dbg_display_colliders(g_player, g_map, g_bombs)
 function dbg_display_colliders(player, map, bombs)
     circ(player.pos.x, player.pos.y, player.collider.radius, Colors.White)
     for cell in all(map.cells) do
@@ -19,6 +21,7 @@ function dbg_display_colliders(player, map, bombs)
     end
 end
 
+-- e.g. dbg_display_anim_state(g_player, { x = 0, y = 60 }, g_anims)
 function dbg_display_anim_state(obj, pos, anims)
     local anim_state = obj.anim_state
     local flip = ""
@@ -44,6 +47,9 @@ function dbg_display_anim_state(obj, pos, anims)
     print("last: "..           anim_name, pos.x, pos.y + 50, Colors.White)
 end
 
+-- e.g.
+--   dbg_set_tiles_visible(maps, nil)
+--   dbg_set_tiles_visible(maps, { TileType.PageItem, TileType.FloorExit })
 function dbg_set_tiles_visible(maps, tile_types)
     for map in all(maps) do
         for cell in all(map.cells) do

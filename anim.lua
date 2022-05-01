@@ -1,8 +1,7 @@
 -- anim.lua - animation logic
 
 --
--- N.B. lots of this code is adapted from scathe's anim
--- function on the pico8 bbs
+-- N.B. adapted from scathe's anim function on the pico8 bbs
 -- https://www.lexaloffle.com/bbs/?tid=3115&autoplay=1#pp
 -- Thanks scathe!
 --
@@ -17,10 +16,6 @@ function create_anim(frames, speed, tile_size, flip)
     }
 end
 
-function new_anim_state()
-    return { a_ct = 0, a_st = 0, a_fr = 0, loop = 0 }
-end
-
 function reset_anim(obj)
     obj.anim_state.a_ct = 0
     obj.anim_state.a_st = 0
@@ -28,7 +23,7 @@ function reset_anim(obj)
 end
 
 function update_anim(obj, anim)
-    obj.anim_state = obj.anim_state or new_anim_state()
+    obj.anim_state = obj.anim_state or { a_ct = 0, a_st = 0, a_fr = 0, loop = 0 }
     local anim_state = obj.anim_state
 
     anim_state.a_ct += 1

@@ -66,13 +66,13 @@ function make_ui_timer(on_shake, total_ticks)
         return self.blink_ticks >= self.blink_period
     end
 
-    local get_timestamp = function (time_in_minutes)
-        local hrs_part = flr(time_in_minutes / 60)
-        local fixed_point_minutes_part = time_in_minutes % 60
-        local minutes_part = flr(fixed_point_minutes_part)
-        local fixed_point_seconds_part = (fixed_point_minutes_part & 0x0000.ffff) * 60
-        local seconds_part = flr(fixed_point_seconds_part)
-        return { Hours = hrs_part, Minutes = minutes_part, Seconds = seconds_part }
+    local as_datetime = function (time_in_mins)
+        local hrs_part = flr(time_in_mins / 60)
+        local fixed_point_mins_part = time_in_mins % 60
+        local mins_part = flr(fixed_point_mins_part)
+        local fixed_point_secs_part = (fixed_point_mins_part & 0x0000.ffff) * 60
+        local secs_part = flr(fixed_point_secs_part)
+        return { hrs = hrs_part, mins = mins_part, secs = secs_part }
     end
 
     local start_timer = function()
@@ -112,10 +112,10 @@ function make_ui_timer(on_shake, total_ticks)
 
         local time_elapsed_ratio = get_timer_completion_ratio(current_tick_count)
         local ingame_total_minutes = (24 * 60)
-        local time_remaining_minutes = (1 - time_elapsed_ratio) * ingame_total_minutes
-        local time_remaining_parts = get_timestamp(time_remaining_minutes)
+        local min_remaining = (1 - time_elapsed_ratio) * ingame_total_minutes
+        local time = as_datetime(min_remaining)
 
-        local timer_text = format_int_base10(time_remaining_parts.Hours, 2) .. "H:" .. format_int_base10(time_remaining_parts.Minutes, 2) .. "M:" .. format_int_base10(time_remaining_parts.Seconds, 2) .. "S"
+        local timer_text = int_leftpad(time.hrs, 2) .. "H:" .. int_leftpad(time.mins, 2) .. "M:" .. int_leftpad(time.secs, 2) .. "S"
 
         -- render the timer text with a gray drop shadow
         print(timer_text, text_pos_x + 1, text_pos_y + 1, Colors.DarkGray)

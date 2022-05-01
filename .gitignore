@@ -1,2 +1,4 @@
 # for now the packaging script will default output pico8 proto carts with this name
 proto_*.p8
+*.bin
+*.zip
