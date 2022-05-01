@@ -1,3 +1,5 @@
+-- FIXME: I think it would be useful to put the final book in your UI also
+-- FIXME: hit game over bug
 -- main.lua - main game logic
 
 GamePhase = {
@@ -723,7 +725,7 @@ function update_detector(detector)
 end
 
 function draw_detector_ui(detector)
-    g_dui = { x = 0, y = 20, w = 10, h = 50 }
+    g_dui = { x = 2, y = 20, w = 8, h = 50 }
 
     rect(g_dui.x, g_dui.y, g_dui.x + g_dui.w, g_dui.y + g_dui.h, Colors.White)
 
