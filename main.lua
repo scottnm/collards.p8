@@ -583,22 +583,6 @@ function draw_game()
         bomb.draw()
     end
 
-    -- FIXME: tmp!!!!
-    -- draw interference values
-    -- for cell in all(g_map.cells) do
-    --     if cell.interference != nil then
-    --         local i = flr(cell.interference * 100)/100
-    --         line(cell.pos.x, cell.pos.y, g_player.pos.x, g_player.pos.y, Colors.White)
-    --         mp = cell.pos
-    --         rectfill(mp.x, mp.y, mp.x + 15, mp.y + 6, Colors.Black)
-    --         print(""..i, mp.x, mp.y, Colors.White)
-    --     end
-    -- end
-    -- g_player.interference = g_player.interference or 0
-    -- local pi = flr(g_player.interference * 100)/100
-    -- rectfill(g_player.pos.x, g_player.pos.y, g_player.pos.x + 15, g_player.pos.y+6, Colors.Black)
-    -- print(""..pi, g_player.pos.x, g_player.pos.y, Colors.White)
-
     -- uncomment to display anim state for debugging
     -- dbg_display_anim_state(g_player, { x = 0, y = 60 }, g_anims)
 
@@ -982,14 +966,13 @@ function gen_maps(num_maps)
     -- Last but not least, we'll create the last level. This level has unique structure and is created last
     -- It's just the single goal item in the middle of an empty layer.
     local final_map = gen_empty_level(num_maps, MAX_TILE_LINE())
+    -- set the altar point in middle
+    local altar_cell_idx = flr(#final_map.cells / 2) + 1
+    final_map.cells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
+    final_map.cells[altar_cell_idx].tile.has_book = true
     -- set the final level's entry
     local final_map_start_iso_idx = select_random_empty_tile_idx_from_map(final_map)
     final_map.cells[final_map_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
-    -- FIXME: maybe the altar should always be in the middle
-    -- set the altar point
-    local altar_cell_idx = select_random_empty_tile_idx_from_map(final_map)
-    final_map.cells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
-    final_map.cells[altar_cell_idx].tile.has_book = true
     -- turn every other cell into a stone floor cell
     for cell in all(final_map.cells) do
         if cell.tile.type == TileType.Empty then
