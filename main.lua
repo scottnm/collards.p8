@@ -729,8 +729,7 @@ end
 
 function draw_book_ui(player)
     -- collected book UI is drawn in screenspace. Temporarily reset the camera.
-    camera_x = peek2(0x5f28)
-    camera_y = peek2(0x5f2a)
+    cam_state = save_cam_state()
     camera(0, 0)
 
     local tile_px_width = 8
@@ -745,8 +744,7 @@ function draw_book_ui(player)
         draw_book({x=120,y=120}, false)
     end
 
-    -- restore the camera
-    camera(camera_x, camera_y)
+    restore_cam_state(cam_state)
 end
 
 function center_text(rect, text)
@@ -836,10 +834,8 @@ function set_banner(text, banner_type, banner_time)
 end
 
 function draw_banner(text, fg_color, bg_color)
-    -- Banners are drawn in screen space.
-    -- Grab the camera position from its memory mapped position so we can clear and later reset it
-    camera_x = peek2(0x5f28)
-    camera_y = peek2(0x5f2a)
+    -- Banners are drawn in screenspace. Temporarily reset the camera.
+    cam_state = save_cam_state()
     camera(0, 0)
 
     local bg_rect = { x = 0, y = 98, width = 128, height = 10 }
@@ -848,8 +844,7 @@ function draw_banner(text, fg_color, bg_color)
     local text_pos = center_text(bg_rect, text)
     print(text, text_pos.x, text_pos.y, fg_color)
 
-    -- restore the camera
-    camera(camera_x, camera_y)
+    restore_cam_state(cam_state)
 end
 
 function spr_centered(frame, x, y, tile_width, tile_height, flip_x, flip_y)

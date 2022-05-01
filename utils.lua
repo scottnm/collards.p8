@@ -103,3 +103,11 @@ end
 function sqr_dist(a, b)
     return sqr(a.x - b.x) + sqr(a.y - b.y)
 end
+
+function save_cam_state()
+    return { x = peek2(0x5f28), y = peek2(0x5f2a) }
+end
+
+function restore_cam_state(c)
+    camera(c.x, c.y)
+end
