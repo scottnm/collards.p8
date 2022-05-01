@@ -118,7 +118,7 @@ function reset()
     move_to_level(1, TileType.FloorEntry)
 
     -- detector values move between 0 and 1
-    g_detector = { cursor_val = 0.5, cursor_target = 0.5, next_scan = 0 }
+    g_detector = { cursor_val = 0, cursor_target = 0, next_scan = 0 }
 end
 
 function _update()
@@ -691,7 +691,7 @@ function draw_game_over()
 end
 
 function update_detector(detector)
-    g_cursor_speed = 0.03
+    g_cursor_speed = 0.05
 
     local do_proximity_scan = false
     detector.next_scan -= 1
@@ -712,10 +712,7 @@ function update_detector(detector)
                 max_interference = max(max_interference, item_interference)
             end
         end
-        printh("i:"..max_interference)
-
-        -- FIXME: enable after checking
-        -- detector.cursor_target = interference
+        detector.cursor_target = max_interference
     end
 
     if detector.cursor_val > detector.cursor_target then
@@ -985,7 +982,7 @@ function gen_maps(num_maps)
     add(maps, final_map)
 
     -- uncomment this to make all tiles visible at start
-    dbg_set_tiles_visible(maps, nil)
+    -- dbg_set_tiles_visible(maps, nil)
 
     -- uncomment this to make all exit tiles and page tiles visible at start
     -- dbg_set_tiles_visible(maps, { TileType.PageItem, TileType.FloorExit })
