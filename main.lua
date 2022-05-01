@@ -730,7 +730,13 @@ function draw_detector_ui(detector)
     -- cursor_val is a ratio between 0->1 of how far up the detector bar the cursor should be
     -- invert the ratio since y values grow downwards
     local cursor_y = g_dui.y + (g_dui.h * (1 - detector.cursor_val))
-    line(g_dui.x, cursor_y, g_dui.x + (g_dui.w * .75), cursor_y)
+    line(g_dui.x, cursor_y, g_dui.x + (g_dui.w * .60), cursor_y)
+
+    g_num_markers = 5
+    for i=1,g_num_markers do
+        local marker_ofs = flr(g_dui.h/(g_num_markers+1)) * i
+        pset(g_dui.x+g_dui.w-1, g_dui.y + marker_ofs, Colors.White)
+    end
 end
 
 function draw_page_ui(player)
