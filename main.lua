@@ -117,7 +117,6 @@ function reset()
     g_maps = gen_maps(10)
     move_to_level(1, TileType.FloorEntry)
 
-    -- detector values move between 0 and 1
     g_detector = { cursor_val = 0, cursor_target = 0, next_scan = 0 }
 end
 
@@ -684,6 +683,7 @@ function update_detector(detector)
             local ttype = cell.tile.type
             if ttype == TileType.BombItem or ttype == TileType.PageItem then
                 local item_dist = sqrt(sqr_dist(g_player.pos, cell.pos));
+                -- detector values move between 0 and 1
                 local item_interference = clamp(0, 1 - (item_dist/48), 1)
                 max_interference = max(max_interference, item_interference)
             end
@@ -719,6 +719,7 @@ function draw_detector_ui(detector)
     local cursor_y = g_dui.y + (g_dui.h * adj_cursor_val)
     line(g_dui.x, cursor_y, g_dui.x + (g_dui.w * .60), cursor_y)
 
+    -- draw some markers on the right side of the meter to make this look more like a measuring device
     g_num_markers = 5
     for i=1,g_num_markers do
         local marker_ofs = flr(g_dui.h/(g_num_markers+1)) * i
