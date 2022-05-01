@@ -693,7 +693,7 @@ function draw_game_over()
 end
 
 function update_detector(detector)
-    g_cursor_speed = 0.05
+    g_cursor_speed = 0.04
 
     local do_proximity_scan = false
     detector.next_scan -= 1
@@ -725,13 +725,22 @@ function update_detector(detector)
 end
 
 function draw_detector_ui(detector)
+    -- dui == detector ui
     g_dui = { x = 2, y = 20, w = 8, h = 50 }
 
     rect(g_dui.x, g_dui.y, g_dui.x + g_dui.w, g_dui.y + g_dui.h, Colors.White)
 
+    -- also add some shake for flair
+    local cursor_shake = 0
+    if rnd(1) > 0.7 then -- only shake a ~30% of frames.
+        cursor_shake = (rnd(2) - 1) / g_dui.h
+    end
+
     -- cursor_val is a ratio between 0->1 of how far up the detector bar the cursor should be
     -- invert the ratio since y values grow downwards
-    local cursor_y = g_dui.y + (g_dui.h * (1 - detector.cursor_val))
+    -- clamp between 0.05 and 0.95 so our cursor is always within the detector UI
+    local adj_cursor_val = clamp(0.05, 1 - detector.cursor_val + cursor_shake, 0.95)
+    local cursor_y = g_dui.y + (g_dui.h * adj_cursor_val)
     line(g_dui.x, cursor_y, g_dui.x + (g_dui.w * .60), cursor_y)
 
     g_num_markers = 5
