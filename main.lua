@@ -116,6 +116,8 @@ function reset()
 
     g_maps = gen_maps(10)
     move_to_level(1, TileType.FloorEntry)
+
+    g_detector = { cursor_val = 0, cursor_target = 0, next_scan = 0 }
 end
 
 function _update()
@@ -153,6 +155,9 @@ function main_game_update(input)
 
     -- update our in-game accelerated timer UI
     g_game_timer_ui.update(g_maingame_tick_count)
+
+    -- update the ui detector cursor
+    update_detector(g_detector)
 
     -- handle input blocking animation states
     local block_input = false
@@ -236,13 +241,6 @@ function main_game_update(input)
 
     if g_maingame_tick_count >= MAINGAME_TIME_LIMIT() then
         handle_game_over(false)
-        g_game_over_state = {
-            substate = "scroll_timer",
-            timer_scroll = 0,
-        }
-        g_game_phase = GamePhase.GameOver
-        g_game_timer_ui.set_blinking(true)
-        music(-1, 1000)
     end
 end
 
@@ -600,12 +598,15 @@ function draw_game()
         end
     end
 
+    -- draw the metal detector
+    draw_detector_ui(g_detector)
+
     -- draw the bomb counter UI
     draw_bomb_item({ x = 4, y = 111 })
     print(":"..g_player.bomb_count, 8, 110, Colors.White)
 
-    -- draw the page UI
-    draw_page_ui(g_player)
+    -- draw the collected book UI
+    draw_book_ui(g_player)
 
     -- draw the in-game timer UI
     g_game_timer_ui.draw(g_maingame_tick_count)
@@ -626,8 +627,8 @@ function draw_game_over()
         local player_sprite_pos = sprite_pos(g_player)
         draw_anim(g_player, player_sprite_pos)
 
-        -- draw the page UI
-        draw_page_ui(g_player)
+        -- draw the collected book UI
+        draw_book_ui(g_player)
 
         -- reset the camera to 0 keep the UI fixed on screen
         camera(0, 0)
@@ -660,27 +661,90 @@ function draw_game_over()
 
         print(sub(game_over_text, start_char, end_char), 10, 10, Colors.White)
 
-        -- draw the page UI
-        draw_page_ui(g_player)
+        -- draw the collected book UI
+        draw_book_ui(g_player)
     end
 end
 
-function draw_page_ui(player)
-    -- Page UI is drawn in screnspace. Temporarily reset the camera.
-    camera_x = peek2(0x5f28)
-    camera_y = peek2(0x5f2a)
+function update_detector(detector)
+    g_cursor_speed = 0.04
+
+    local do_proximity_scan = false
+    detector.next_scan -= 1
+    if detector.next_scan <= 0 then
+        do_proximity_scan = true
+        detector.next_scan = 15
+    end
+
+    -- if we need to do a proximity scan, calculate the
+    if do_proximity_scan then
+        local max_interference = 0
+        for cell in all(g_map.cells) do
+            local ttype = cell.tile.type
+            if ttype == TileType.BombItem or ttype == TileType.PageItem then
+                local item_dist = sqrt(sqr_dist(g_player.pos, cell.pos));
+                -- detector values move between 0 and 1
+                local item_interference = clamp(0, 1 - (item_dist/48), 1)
+                max_interference = max(max_interference, item_interference)
+            end
+        end
+        -- NOTE: maybe in the future, lava should also factor into interference to mislead the player. Only do this
+        -- if things are too easy without the additional misleading interference
+        detector.cursor_target = max_interference
+    end
+
+    if detector.cursor_val > detector.cursor_target then
+        detector.cursor_val = max(detector.cursor_val - g_cursor_speed, detector.cursor_target)
+    else
+        detector.cursor_val = min(detector.cursor_val + g_cursor_speed, detector.cursor_target)
+    end
+end
+
+function draw_detector_ui(detector)
+    -- dui == detector ui
+    g_dui = { x = 2, y = 20, w = 8, h = 50 }
+
+    rect(g_dui.x, g_dui.y, g_dui.x + g_dui.w, g_dui.y + g_dui.h, Colors.White)
+
+    -- also add some shake for flair
+    local cursor_shake = 0
+    if rnd(1) > 0.7 then -- only shake a ~30% of frames.
+        cursor_shake = (rnd(2) - 1) / g_dui.h
+    end
+
+    -- cursor_val is a ratio between 0->1 of how far up the detector bar the cursor should be
+    -- invert the ratio since y values grow downwards
+    -- clamp between 0.05 and 0.95 so our cursor is always within the detector UI
+    local adj_cursor_val = clamp(0.05, 1 - detector.cursor_val + cursor_shake, 0.95)
+    local cursor_y = g_dui.y + (g_dui.h * adj_cursor_val)
+    line(g_dui.x, cursor_y, g_dui.x + (g_dui.w * .60), cursor_y)
+
+    -- draw some markers on the right side of the meter to make this look more like a measuring device
+    g_num_markers = 5
+    for i=1,g_num_markers do
+        local marker_ofs = flr(g_dui.h/(g_num_markers+1)) * i
+        pset(g_dui.x+g_dui.w-1, g_dui.y + marker_ofs, Colors.White)
+    end
+end
+
+function draw_book_ui(player)
+    -- collected book UI is drawn in screenspace. Temporarily reset the camera.
+    cam_state = save_cam_state()
     camera(0, 0)
 
     local tile_px_width = 8
     local tile_px_height = 8
     for i=1,#g_player.collected_pages do
-        local x = 128 - (i*tile_px_width)
+        local x = 120 - (i*tile_px_width)
         local y = 120
         draw_page_item({x=x, y=y}, g_player.collected_pages[i])
     end
 
-    -- restore the camera
-    camera(camera_x, camera_y)
+    if player.book_state == BookState.Holding then
+        draw_book({x=120,y=120}, false)
+    end
+
+    restore_cam_state(cam_state)
 end
 
 function center_text(rect, text)
@@ -770,10 +834,8 @@ function set_banner(text, banner_type, banner_time)
 end
 
 function draw_banner(text, fg_color, bg_color)
-    -- Banners are drawn in screen space.
-    -- Grab the camera position from its memory mapped position so we can clear and later reset it
-    camera_x = peek2(0x5f28)
-    camera_y = peek2(0x5f2a)
+    -- Banners are drawn in screenspace. Temporarily reset the camera.
+    cam_state = save_cam_state()
     camera(0, 0)
 
     local bg_rect = { x = 0, y = 98, width = 128, height = 10 }
@@ -782,8 +844,7 @@ function draw_banner(text, fg_color, bg_color)
     local text_pos = center_text(bg_rect, text)
     print(text, text_pos.x, text_pos.y, fg_color)
 
-    -- restore the camera
-    camera(camera_x, camera_y)
+    restore_cam_state(cam_state)
 end
 
 function spr_centered(frame, x, y, tile_width, tile_height, flip_x, flip_y)
@@ -897,14 +958,13 @@ function gen_maps(num_maps)
     -- Last but not least, we'll create the last level. This level has unique structure and is created last
     -- It's just the single goal item in the middle of an empty layer.
     local final_map = gen_empty_level(num_maps, MAX_TILE_LINE())
+    -- set the altar point in middle
+    local altar_cell_idx = flr(#final_map.cells / 2) + 1
+    final_map.cells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
+    final_map.cells[altar_cell_idx].tile.has_book = true
     -- set the final level's entry
     local final_map_start_iso_idx = select_random_empty_tile_idx_from_map(final_map)
     final_map.cells[final_map_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
-    -- FIXME: maybe the altar should always be in the middle
-    -- set the altar point
-    local altar_cell_idx = select_random_empty_tile_idx_from_map(final_map)
-    final_map.cells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
-    final_map.cells[altar_cell_idx].tile.has_book = true
     -- turn every other cell into a stone floor cell
     for cell in all(final_map.cells) do
         if cell.tile.type == TileType.Empty then
@@ -1497,6 +1557,7 @@ function handle_game_over(game_won)
         substate = "scroll_timer",
         timer_scroll = 0,
     }
+
     if game_won then
         g_game_over_state.game_over_text = gen_win_text(#g_player.collected_pages, TOTAL_PAGE_COUNT())
     else
