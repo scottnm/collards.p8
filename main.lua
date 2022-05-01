@@ -1,4 +1,3 @@
--- FIXME: I think it would be useful to put the final book in your UI also
 -- FIXME: hit game over bug
 -- main.lua - main game logic
 
@@ -615,8 +614,8 @@ function draw_game()
     draw_bomb_item({ x = 4, y = 111 })
     print(":"..g_player.bomb_count, 8, 110, Colors.White)
 
-    -- draw the page UI
-    draw_page_ui(g_player)
+    -- draw the collected book UI
+    draw_book_ui(g_player)
 
     -- draw the in-game timer UI
     g_game_timer_ui.draw(g_maingame_tick_count)
@@ -637,8 +636,8 @@ function draw_game_over()
         local player_sprite_pos = sprite_pos(g_player)
         draw_anim(g_player, player_sprite_pos)
 
-        -- draw the page UI
-        draw_page_ui(g_player)
+        -- draw the collected book UI
+        draw_book_ui(g_player)
 
         -- reset the camera to 0 keep the UI fixed on screen
         camera(0, 0)
@@ -671,8 +670,8 @@ function draw_game_over()
 
         print(sub(game_over_text, start_char, end_char), 10, 10, Colors.White)
 
-        -- draw the page UI
-        draw_page_ui(g_player)
+        -- draw the collected book UI
+        draw_book_ui(g_player)
     end
 end
 
@@ -688,7 +687,6 @@ function update_detector(detector)
 
     -- if we need to do a proximity scan, calculate the
     if do_proximity_scan then
-        -- FIXME: consider factoring lava into this if this makes things too easy
         local max_interference = 0
         for cell in all(g_map.cells) do
             local ttype = cell.tile.type
@@ -698,6 +696,8 @@ function update_detector(detector)
                 max_interference = max(max_interference, item_interference)
             end
         end
+        -- NOTE: maybe in the future, lava should also factor into interference to mislead the player. Only do this
+        -- if things are too easy without the additional misleading interference
         detector.cursor_target = max_interference
     end
 
@@ -734,8 +734,8 @@ function draw_detector_ui(detector)
     end
 end
 
-function draw_page_ui(player)
-    -- Page UI is drawn in screnspace. Temporarily reset the camera.
+function draw_book_ui(player)
+    -- collected book UI is drawn in screenspace. Temporarily reset the camera.
     camera_x = peek2(0x5f28)
     camera_y = peek2(0x5f2a)
     camera(0, 0)
@@ -743,9 +743,13 @@ function draw_page_ui(player)
     local tile_px_width = 8
     local tile_px_height = 8
     for i=1,#g_player.collected_pages do
-        local x = 128 - (i*tile_px_width)
+        local x = 120 - (i*tile_px_width)
         local y = 120
         draw_page_item({x=x, y=y}, g_player.collected_pages[i])
+    end
+
+    if player.book_state == BookState.Holding then
+        draw_book({x=120,y=120}, false)
     end
 
     -- restore the camera
