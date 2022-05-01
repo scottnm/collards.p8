@@ -2,7 +2,7 @@
 
 A Pico-8 game for the ["Classic Collards" Game Jam](https://itch.io/jam/culture-bytes-classic-collards-jam)
 
-Checkout the [itch.io page](https://scottnm.itch.io/dig-deep) for more info.
+Checkout the [itch.io page](https://scottnm.itch.io/dig-deep) for more info and downloads.
 
 ## Main Team
 
