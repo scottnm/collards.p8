@@ -701,29 +701,45 @@ function update_detector(detector)
 end
 
 function draw_detector_ui(detector)
-    -- dui == detector ui
-    g_dui = { x = 2, y = 20, w = 8, h = 50 }
-
-    rect(g_dui.x, g_dui.y, g_dui.x + g_dui.w, g_dui.y + g_dui.h, Colors.White)
-
     -- also add some shake for flair
     local cursor_shake = 0
     if rnd(1) > 0.7 then -- only shake a ~30% of frames.
-        cursor_shake = (rnd(2) - 1) / g_dui.h
+        cursor_shake = (rnd(2) - 1) / 50
     end
 
     -- cursor_val is a ratio between 0->1 of how far up the detector bar the cursor should be
     -- invert the ratio since y values grow downwards
     -- clamp between 0.05 and 0.95 so our cursor is always within the detector UI
-    local adj_cursor_val = clamp(0.05, 1 - detector.cursor_val + cursor_shake, 0.95)
-    local cursor_y = g_dui.y + (g_dui.h * adj_cursor_val)
-    line(g_dui.x, cursor_y, g_dui.x + (g_dui.w * .60), cursor_y)
+    local adj_cursor_val = clamp(0.01, 1 - detector.cursor_val + cursor_shake, 0.99)
 
-    -- draw some markers on the right side of the meter to make this look more like a measuring device
-    g_num_markers = 5
-    for i=1,g_num_markers do
-        local marker_ofs = flr(g_dui.h/(g_num_markers+1)) * i
-        pset(g_dui.x+g_dui.w-1, g_dui.y + marker_ofs, Colors.White)
+    g_dial_pos = { x = 2, y = 45 }
+    g_dial_radius = 15
+
+    -- draw the dial body (draw a half-moon by drawing a circle and clipping out the left half)
+    clip(g_dial_pos.x, 0, 126, 128)
+    circ(g_dial_pos.x, g_dial_pos.y, g_dial_radius, Colors.White)
+    clip() -- restore the clipping rect
+
+    function calc_dial_pos(ratio, factor)
+        -- mul by 1/2 because our full ratio only covers half the circle
+        -- subtract 0.25 so our 0 position is at the top of the unit circle
+        local angle = (ratio * 0.5) - 0.25
+        local x = cos(angle) * factor
+        local y = -1 * sin(angle) * factor  -- pico8s sin is y-inverted so flip the y value back
+        return x,y
+    end
+
+    -- draw the dial
+    local dial_x, dial_y = calc_dial_pos(adj_cursor_val, 0.6 * g_dial_radius)
+    line(g_dial_pos.x, g_dial_pos.y, g_dial_pos.x + dial_x, g_dial_pos.y + dial_y, Colors.White)
+
+    -- draw the dial markers
+    g_num_marks = 7
+    for i=0,g_num_marks do
+        dial_x, dial_y = calc_dial_pos(i/g_num_marks, g_dial_radius * .8)
+        pset(g_dial_pos.x + dial_x, g_dial_pos.y + dial_y, Colors.White)
+        dial_x = cos(dial_angle) * g_dial_radius
+        dial_y = -1 * sin(dial_angle) * g_dial_radius
     end
 end
 
