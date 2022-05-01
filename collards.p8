@@ -1,6 +1,8 @@
 pico-8 cartridge // http://www.pico-8.com
 version 35
 __lua__
+-- Dig Deep
+-- by Scott Munro, Tania Pavlisak, Tim S. Davis, David McKee, David Whitaker
 
 -- run the main game
 #include main.lua
