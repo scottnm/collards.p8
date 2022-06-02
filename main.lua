@@ -708,7 +708,6 @@ function draw_book_ui(player)
     camera(0, 0)
 
     local tile_px_width = 8
-    local tile_px_height = 8
     for i=1,#g_player.collected_pages do
         local x_ofs = i*tile_px_width
         draw_page_item(vec_new(120-x_ofs, 120), g_player.collected_pages[i])
@@ -723,12 +722,12 @@ end
 
 function center_text(rect, text)
     local text_len = #text
-    local text_pixel_width = 4 * text_len
-    local text_pixel_height = 6
-    local text_start_x = rect.x + (rect.width/2) - (text_pixel_width/2)
-    local text_start_y = rect.y + (rect.height/2) - (text_pixel_height/2)
+    local text_width = 4 * text_len
+    local text_height = 6
+    local text_x = rect.x + (rect.width/2) - (text_width/2)
+    local text_y = rect.y + (rect.height/2) - (text_height/2)
     -- y + 1 to account for the extra pixel buffer below the font
-    return vec_new(text_start_x, text_start_y + 1)
+    return vec_new(text_x, text_y + 1)
 end
 
 function draw_hint_arrow(pos, hint)
