@@ -63,7 +63,7 @@ function TOTAL_PAGE_COUNT()
 end
 
 function MAINGAME_TIME_LIMIT()
-    return (5 * 60 * 30) -- five minutes worth of ticks
+    return 5 * 60 * 30 -- five minutes worth of ticks
 end
 
 function _init()
