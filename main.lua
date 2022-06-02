@@ -1340,18 +1340,18 @@ function new_bomb(pos, on_explosion_start)
         local explosion_scale = 10
         return {
             gen_explosion(  0, copy_vec2(pos)),       -- center
-            gen_explosion( -8, add_vec2(pos, scale_vec2(   up_left, 1 * explosion_scale))), -- up left 1
-            gen_explosion(-16, add_vec2(pos, scale_vec2(   up_left, 2 * explosion_scale))), -- up left 2
-            gen_explosion(-24, add_vec2(pos, scale_vec2(   up_left, 3 * explosion_scale))), -- up left 3
-            gen_explosion( -8, add_vec2(pos, scale_vec2(  up_right, 1 * explosion_scale))), -- up right 1
-            gen_explosion(-16, add_vec2(pos, scale_vec2(  up_right, 2 * explosion_scale))), -- up right 2
-            gen_explosion(-24, add_vec2(pos, scale_vec2(  up_right, 3 * explosion_scale))), -- up right 3
-            gen_explosion( -8, add_vec2(pos, scale_vec2( down_left, 1 * explosion_scale))), -- down left 1
-            gen_explosion(-16, add_vec2(pos, scale_vec2( down_left, 2 * explosion_scale))), -- down left 2
-            gen_explosion(-24, add_vec2(pos, scale_vec2( down_left, 3 * explosion_scale))), -- down left 3
-            gen_explosion( -8, add_vec2(pos, scale_vec2(down_right, 1 * explosion_scale))), -- down right 1
-            gen_explosion(-16, add_vec2(pos, scale_vec2(down_right, 2 * explosion_scale))), -- down right 2
-            gen_explosion(-24, add_vec2(pos, scale_vec2(down_right, 3 * explosion_scale))), -- down right 3
+            gen_explosion( -8, add_vec2(pos, scale_vec2(   up_left, 1 * explosion_scale))),
+            gen_explosion(-16, add_vec2(pos, scale_vec2(   up_left, 2 * explosion_scale))),
+            gen_explosion(-24, add_vec2(pos, scale_vec2(   up_left, 3 * explosion_scale))),
+            gen_explosion( -8, add_vec2(pos, scale_vec2(  up_right, 1 * explosion_scale))),
+            gen_explosion(-16, add_vec2(pos, scale_vec2(  up_right, 2 * explosion_scale))),
+            gen_explosion(-24, add_vec2(pos, scale_vec2(  up_right, 3 * explosion_scale))),
+            gen_explosion( -8, add_vec2(pos, scale_vec2( down_left, 1 * explosion_scale))),
+            gen_explosion(-16, add_vec2(pos, scale_vec2( down_left, 2 * explosion_scale))),
+            gen_explosion(-24, add_vec2(pos, scale_vec2( down_left, 3 * explosion_scale))),
+            gen_explosion( -8, add_vec2(pos, scale_vec2(down_right, 1 * explosion_scale))),
+            gen_explosion(-16, add_vec2(pos, scale_vec2(down_right, 2 * explosion_scale))),
+            gen_explosion(-24, add_vec2(pos, scale_vec2(down_right, 3 * explosion_scale))),
         }
     end
 
