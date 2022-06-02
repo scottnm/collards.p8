@@ -83,3 +83,23 @@ end
 function restore_cam_state(c)
     camera(c.x, c.y)
 end
+
+function vec_new(x,y)
+    return { x=x, y=y }
+end
+
+function vec_copy(v)
+    return vec_new(v.x, v.y)
+end
+
+function vec_add(v1, v2)
+    return vec_new(v1.x + v2.x, v1.y + v2.y)
+end
+
+function vec_sub(v1, v2)
+    return vec_new(v1.x - v2.x, v1.y - v2.y)
+end
+
+function vec_scale(v, s)
+    return vec_new(v.x * s, v.y * s)
+end

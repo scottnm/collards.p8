@@ -1488,26 +1488,6 @@ function gen_win_text(collected_page_count, total_page_count)
     return split_text(text)
 end
 
-function vec_new(x,y)
-    return { x=x, y=y }
-end
-
-function vec_copy(v)
-    return vec_new(v.x, v.y)
-end
-
-function vec_add(v1, v2)
-    return vec_new(v1.x + v2.x, v1.y + v2.y)
-end
-
-function vec_sub(v1, v2)
-    return vec_new(v1.x - v2.x, v1.y - v2.y)
-end
-
-function vec_scale(v, s)
-    return vec_new(v.x * s, v.y * s)
-end
-
 function handle_game_over(game_won)
     g_game_over_state = {
         substate = "scroll_timer",
