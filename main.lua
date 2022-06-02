@@ -78,14 +78,14 @@ function reset()
     g_game_over_state = nil
     g_player = {
         book_state = BookState.NotFound,
-        pos = { x = 0, y = 0 },
-        sprite_offset = { x = -8, y = -14 },
+        pos = vec_new(0, 0),
+        sprite_offset = vec_new(-8, -14),
         collider = { radius = 3 },
         bomb_count = 0,
         collected_pages = {},
     }
 
-    g_camera_player_offset = { x = 0, y = 0 }
+    g_camera_player_offset = vec_new(0, 0)
 
     g_anims = {
         IdleDown = create_anim({34}, 10, 2, false),
@@ -434,7 +434,7 @@ function get_die_anim_for_player(player)
 end
 
 function get_centered_camera_on_player(player)
-    return  { x = player.pos.x - 64, y = player.pos.y - 64 }
+    return  vec_new(player.pos.x - 64, player.pos.y - 64)
 end
 
 function camera_follow_player(player, camera_ofs)
@@ -446,7 +446,7 @@ function camera_follow_player(player, camera_ofs)
     end
 
     -- If the camera is outside of the max allowed distance, move it closer
-    local dir_vec = sub_vec2(camera_ofs, player_camera_center_ofs)
+    local dir_vec = vec_sub(camera_ofs, player_camera_center_ofs)
 
     -- get a unit vector for the direction to move the camera
     local dist = sqrt(dist_squared)
@@ -457,7 +457,7 @@ function camera_follow_player(player, camera_ofs)
     dir_vec.x *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
     dir_vec.y *= MAX_CAMERA_DISTANCE_FROM_PLAYER()
 
-    new_ofs = add_vec2(player.pos, dir_vec)
+    new_ofs = vec_add(player.pos, dir_vec)
     camera_ofs.x = new_ofs.x - 64
     camera_ofs.y = new_ofs.y - 64
 end
@@ -545,7 +545,7 @@ function draw_game()
 
     -- if the player is collecting an item, draw the item above their collect animation
     if g_player.collect_item_state != nil then
-        local item_pos = add_vec2(g_player.pos, { x = 0, y = -16 })
+        local item_pos = vec_sub(g_player.pos, vec_new(0, 16))
         if g_player.collect_item_state.item == ItemType.Bomb then
             draw_bomb_item(item_pos)
         elseif g_player.collect_item_state.item == ItemType.Page then
@@ -583,7 +583,7 @@ function draw_game()
     draw_detector_ui(g_detector)
 
     -- draw the bomb counter UI
-    draw_bomb_item({ x = 4, y = 111 })
+    draw_bomb_item(vec_new(4, 111))
     print(":"..g_player.bomb_count, 8, 110, Colors.White)
 
     -- draw the book UI
@@ -710,13 +710,12 @@ function draw_book_ui(player)
     local tile_px_width = 8
     local tile_px_height = 8
     for i=1,#g_player.collected_pages do
-        local x = 120 - (i*tile_px_width)
-        local y = 120
-        draw_page_item({x=x, y=y}, g_player.collected_pages[i])
+        local x_ofs = i*tile_px_width
+        draw_page_item(vec_new(120-x_ofs, 120), g_player.collected_pages[i])
     end
 
     if player.book_state == BookState.Holding then
-        draw_book({x=120,y=120}, false)
+        draw_book(vec_new(120, 120), false)
     end
 
     restore_cam_state(cam_state)
@@ -729,7 +728,7 @@ function center_text(rect, text)
     local text_start_x = rect.x + (rect.width/2) - (text_pixel_width/2)
     local text_start_y = rect.y + (rect.height/2) - (text_pixel_height/2)
     -- N.B. y + 1 to account for the extra pixel buffer below the font
-    return { x = text_start_x, y = text_start_y + 1 }
+    return vec_new(text_start_x, text_start_y + 1)
 end
 
 function draw_hint_arrow(pos, hint)
@@ -889,7 +888,7 @@ function gen_maps(num_maps)
         local iso_finish_cell_pos = map.cells[map.finish_cell_idx].pos
         for cell in all(map.cells) do
             if cell.tile.type == TileType.Empty then
-                local dir_vec = sub_vec2(iso_finish_cell_pos, cell.pos)
+                local dir_vec = vec_sub(iso_finish_cell_pos, cell.pos)
                 local unit_circle_ratio = atan2(dir_vec.x, -1 * dir_vec.y)
                 local angle_to_finish_point_deg = unit_circle_ratio * 360
 
@@ -982,10 +981,9 @@ function gen_empty_level(level_id, map_iso_width)
             local cell = {
                 idx = idx,
                 tile = tile,
-                pos = {
-                    x = SCREEN_SIZE()/2 + col_offset,
-                    y = SCREEN_SIZE()/2 + row_offset,
-                },
+                pos = vec_new(
+                    SCREEN_SIZE()/2 + col_offset,
+                    SCREEN_SIZE()/2 + row_offset),
                 collider = { radius = 4 }
             }
 
@@ -1077,7 +1075,7 @@ function move_to_level(next_level, start_tile_type)
         end
     end
     assert(player_start_cell != nil)
-    g_player.pos = copy_vec2(player_start_cell.pos)
+    g_player.pos = vec_copy(player_start_cell.pos)
     g_player.last_visited_cell = player_start_cell
     g_player.last_interacted_cell = player_start_cell
 
@@ -1133,20 +1131,20 @@ function move_player(input)
     dy *= player_spd
 
     -- copy the old position in case we need to roll back
-    local old_player_pos = copy_vec2(g_player.pos)
+    local old_player_pos = vec_copy(g_player.pos)
 
     -- test all potential movements and use the first one that doesn't put us on a fall tile
     local move_candidates = {}
-    add(move_candidates, { x = dx, y = dy })
+    add(move_candidates, vec_new(dx, dy))
     if dx != 0 then
-        add(move_candidates, { x = dx, y = 0 })
+        add(move_candidates, vec_new(dx, 0))
     end
     if dy != 0 then
-        add(move_candidates, { x = 0, y = dy })
+        add(move_candidates, vec_new(0, dy))
     end
 
     for move in all(move_candidates) do
-        g_player.pos = add_vec2(old_player_pos, move)
+        g_player.pos = vec_add(old_player_pos, move)
 
         local cells = get_cells_under_actor(g_map, g_player)
         local valid_move = true
@@ -1214,10 +1212,7 @@ function animate_player(input)
 end
 
 function sprite_pos(obj)
-    return {
-        x = obj.pos.x + obj.sprite_offset.x,
-        y = obj.pos.y + obj.sprite_offset.y,
-    }
+    return vec_add(obj.pos, obj.sprite_offset)
 end
 
 function get_actor_tile_idx(map, actor)
@@ -1259,17 +1254,16 @@ function is_cell_under_actor(cell, actor)
 
     -- setup a simple rect-collider for the actor wrapping their circle collider
     local actor_rect_collider = {
-        pos = {
-            x = actor.pos.x - actor.collider.radius,
-            y = actor.pos.y - actor.collider.radius,
-        },
+        pos = vec_new(
+            actor.pos.x - actor.collider.radius,
+            actor.pos.y - actor.collider.radius),
         width = (actor.collider.radius + actor.collider.radius),
         height = (actor.collider.radius + actor.collider.radius),
     }
 
     for sub_collider in all(iso_sub_colliders) do
         -- center the subcollider in the iso cell
-        sub_collider.pos = { x = cell.pos.x - (sub_collider.width/2), y = cell.pos.y - (sub_collider.height/2) }
+        sub_collider.pos = vec_new(cell.pos.x - (sub_collider.width/2), cell.pos.y - (sub_collider.height/2))
         if rect_colliders_overlap(actor_rect_collider, sub_collider) then
             return true
         end
@@ -1295,14 +1289,14 @@ end
 
 function highlight_cell(cell)
     local cell_pos_x = cell.pos.x
-    local cell_pos_y = cell.pos.y
     -- N.B. for some reason, I need to subtract '1' from each of the y values. I haven't yet rationalized why
     -- the off-by-one pixel shift is needed. I'll figure it out later.
+    local cell_pos_y = cell.pos.y - 1
     local corners = {
-        { x = cell_pos_x - ISO_TILE_WIDTH()/2, y = cell_pos_y - 1 },
-        { x = cell_pos_x,                      y = cell_pos_y - 1 - ISO_TILE_HEIGHT()/2 },
-        { x = cell_pos_x + ISO_TILE_WIDTH()/2, y = cell_pos_y - 1},
-        { x = cell_pos_x,                      y = cell_pos_y - 1+ ISO_TILE_HEIGHT()/2 },
+        vec_new(cell_pos_x - ISO_TILE_WIDTH()/2, cell_pos_y),
+        vec_new(cell_pos_x, cell_pos_y - ISO_TILE_HEIGHT()/2),
+        vec_new(cell_pos_x + ISO_TILE_WIDTH()/2, cell_pos_y),
+        vec_new(cell_pos_x, cell_pos_y + ISO_TILE_HEIGHT()/2),
     }
 
     line(corners[1].x, corners[1].y, corners[2].x, corners[2].y, Colors.White)
@@ -1318,20 +1312,20 @@ function new_bomb(pos, on_explosion_start)
         explosion_timer = make_ingame_timer(32),
         explosions = {},
         active_explosions = {},
-        pos = copy_vec2(pos),
+        pos = vec_copy(pos),
         on_explosion_start = on_explosion_start
     }
 
     function get_center_draw_pos(pos, width, height)
-        return { x = pos.x - width/2, y = pos.y - height/2 }
+        return vec_new(pos.x - width/2, pos.y - height/2)
     end
 
     function gen_explosions(pos)
         local sqrt_half = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
-        local up_right = { x =  2 * sqrt_half, y = -1 * sqrt_half }
-        local up_left = { x = -2 * sqrt_half, y = -1 * sqrt_half }
-        local down_right = { x =  2 * sqrt_half, y =  1 * sqrt_half }
-        local down_left = { x = -2 * sqrt_half, y =  1 * sqrt_half }
+        local up_right = vec_new(2 * sqrt_half, -1 * sqrt_half)
+        local up_left = vec_new(-2 * sqrt_half, -1 * sqrt_half)
+        local down_right = vec_new(2 * sqrt_half, 1 * sqrt_half)
+        local down_left = vec_new(-2 * sqrt_half, 1 * sqrt_half)
 
         function gen_explosion(frame, pos)
             return { frame = frame, pos = pos, collider = { radius = 3 } }
@@ -1339,19 +1333,19 @@ function new_bomb(pos, on_explosion_start)
 
         local explosion_scale = 10
         return {
-            gen_explosion(  0, copy_vec2(pos)),       -- center
-            gen_explosion( -8, add_vec2(pos, scale_vec2(   up_left, 1 * explosion_scale))),
-            gen_explosion(-16, add_vec2(pos, scale_vec2(   up_left, 2 * explosion_scale))),
-            gen_explosion(-24, add_vec2(pos, scale_vec2(   up_left, 3 * explosion_scale))),
-            gen_explosion( -8, add_vec2(pos, scale_vec2(  up_right, 1 * explosion_scale))),
-            gen_explosion(-16, add_vec2(pos, scale_vec2(  up_right, 2 * explosion_scale))),
-            gen_explosion(-24, add_vec2(pos, scale_vec2(  up_right, 3 * explosion_scale))),
-            gen_explosion( -8, add_vec2(pos, scale_vec2( down_left, 1 * explosion_scale))),
-            gen_explosion(-16, add_vec2(pos, scale_vec2( down_left, 2 * explosion_scale))),
-            gen_explosion(-24, add_vec2(pos, scale_vec2( down_left, 3 * explosion_scale))),
-            gen_explosion( -8, add_vec2(pos, scale_vec2(down_right, 1 * explosion_scale))),
-            gen_explosion(-16, add_vec2(pos, scale_vec2(down_right, 2 * explosion_scale))),
-            gen_explosion(-24, add_vec2(pos, scale_vec2(down_right, 3 * explosion_scale))),
+            gen_explosion(  0, vec_copy(pos)),
+            gen_explosion( -8, vec_add(pos, vec_scale(   up_left, 1 * explosion_scale))),
+            gen_explosion(-16, vec_add(pos, vec_scale(   up_left, 2 * explosion_scale))),
+            gen_explosion(-24, vec_add(pos, vec_scale(   up_left, 3 * explosion_scale))),
+            gen_explosion( -8, vec_add(pos, vec_scale(  up_right, 1 * explosion_scale))),
+            gen_explosion(-16, vec_add(pos, vec_scale(  up_right, 2 * explosion_scale))),
+            gen_explosion(-24, vec_add(pos, vec_scale(  up_right, 3 * explosion_scale))),
+            gen_explosion( -8, vec_add(pos, vec_scale( down_left, 1 * explosion_scale))),
+            gen_explosion(-16, vec_add(pos, vec_scale( down_left, 2 * explosion_scale))),
+            gen_explosion(-24, vec_add(pos, vec_scale( down_left, 3 * explosion_scale))),
+            gen_explosion( -8, vec_add(pos, vec_scale(down_right, 1 * explosion_scale))),
+            gen_explosion(-16, vec_add(pos, vec_scale(down_right, 2 * explosion_scale))),
+            gen_explosion(-24, vec_add(pos, vec_scale(down_right, 3 * explosion_scale))),
         }
     end
 
@@ -1494,20 +1488,24 @@ function gen_win_text(collected_page_count, total_page_count)
     return split_text(text)
 end
 
-function copy_vec2(v)
-    return { x = v.x, y = v.y }
+function vec_new(x,y)
+    return { x=x, y=y }
 end
 
-function add_vec2(v1, v2)
-    return { x = v1.x + v2.x, y = v1.y + v2.y }
+function vec_copy(v)
+    return vec_new(v.x, v.y)
 end
 
-function sub_vec2(v1, v2)
-    return { x = v1.x - v2.x, y = v1.y - v2.y }
+function vec_add(v1, v2)
+    return vec_new(v1.x + v2.x, v1.y + v2.y)
 end
 
-function scale_vec2(v, s)
-    return { x = v.x * s, y = v.y * s }
+function vec_sub(v1, v2)
+    return vec_new(v1.x - v2.x, v1.y - v2.y)
+end
+
+function vec_scale(v, s)
+    return vec_new(v.x * s, v.y * s)
 end
 
 function handle_game_over(game_won)
