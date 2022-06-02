@@ -518,7 +518,7 @@ function draw_game()
                 if (cell.tile.type == TileType.Empty) and (cell.tile.hint != nil) then
                     draw_hint_arrow(cell.pos, cell.tile.hint)
                 -- If it's an unretrieved bomb cell, display an inactive bomb sprite in the middle of the cell.
-                -- N.B. this basically only happens if you use a bomb to reveal another bomb.
+                -- This basically only happens if you use a bomb to reveal another bomb.
                 elseif cell.tile.type == TileType.BombItem then
                     draw_bomb_item(cell.pos)
                 elseif cell.tile.type == TileType.PageItem then
@@ -727,7 +727,7 @@ function center_text(rect, text)
     local text_pixel_height = 6
     local text_start_x = rect.x + (rect.width/2) - (text_pixel_width/2)
     local text_start_y = rect.y + (rect.height/2) - (text_pixel_height/2)
-    -- N.B. y + 1 to account for the extra pixel buffer below the font
+    -- y + 1 to account for the extra pixel buffer below the font
     return vec_new(text_start_x, text_start_y + 1)
 end
 
@@ -1216,9 +1216,9 @@ function sprite_pos(obj)
 end
 
 function get_actor_tile_idx(map, actor)
-    -- N.B. Currently we do an extra smaller circle collider check so that we only activate at most one tile at a time
-    -- even if we are standing in between two..
     for cell in all(get_cells_under_actor(map, actor)) do
+        -- Do an additional smaller circle collider check so that we only activate at most one tile at a time
+        -- even if we are standing in between two
         if circ_colliders_overlap(actor, cell) then
             return cell.idx
         end
@@ -1289,8 +1289,7 @@ end
 
 function highlight_cell(cell)
     local cell_pos_x = cell.pos.x
-    -- N.B. for some reason, I need to subtract '1' from each of the y values. I haven't yet rationalized why
-    -- the off-by-one pixel shift is needed. I'll figure it out later.
+    -- For some reason, I need to subtract '1' from each of the y values. I haven't yet rationalized why. Figure out later.
     local cell_pos_y = cell.pos.y - 1
     local corners = {
         vec_new(cell_pos_x - ISO_TILE_WIDTH()/2, cell_pos_y),

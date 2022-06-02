@@ -29,7 +29,7 @@ function rnd_incrange(lower, upper)
     return flr(rnd(upper - lower)) + lower
 end
 
--- clamp a value within a range inclusively
+-- clamp a value within a range
 function clamp(lower, value, upper)
     return mid(lower, value, upper)
 end

@@ -1,7 +1,7 @@
 -- anim.lua - animation logic
 
 --
--- N.B. adapted from scathe's anim function on the pico8 bbs
+-- adapted from scathe's anim function on the pico8 bbs
 -- https://www.lexaloffle.com/bbs/?tid=3115&autoplay=1#pp
 -- Thanks scathe!
 --
