@@ -6,24 +6,24 @@ GamePhase = {
     GameOver = 3,
 }
 
-draw_funcs = {
-    [GamePhase.PreGame] = _draw_title_screen,
-    [GamePhase.MainGame] = _draw_main_game,
-    [GamePhase.GameOver] = _draw_game_over,
-}
-
-update_funcs = {
-    [GamePhase.PreGame] = _update_title_screen,
-    [GamePhase.MainGame] = _update_main_game,
-    [GamePhase.GameOver] = _update_game_over,
-}
-
 function _draw()
-    draw_funcs[g_game_phase]()
+    if g_game_phase == GamePhase.PreGame then
+        _draw_title_screen()
+    elseif g_game_phase == GamePhase.MainGame then
+        _draw_main_game()
+    elseif g_game_phase == GamePhase.GameOver then
+        _draw_game_over()
+    end
 end
 
 function _update()
     input = poll_input()
-    update_funcs[g_game_phase](input)
+    if g_game_phase == GamePhase.PreGame then
+        _update_title_screen(input)
+    elseif g_game_phase == GamePhase.MainGame then
+        _update_main_game(input)
+    elseif g_game_phase == GamePhase.GameOver then
+        _update_game_over(input)
+    end
 end
 
