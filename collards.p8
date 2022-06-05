@@ -5,6 +5,8 @@ __lua__
 -- by Scott Munro, Tania Pavlisak, Tim S. Davis, David McKee, David Whitaker
 
 -- run the main game
+#include screens.lua
+#include pregame.lua
 #include main.lua
 #include sfx.lua
 #include anim.lua

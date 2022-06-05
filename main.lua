@@ -1,11 +1,5 @@
 -- main.lua - main game logic
 
-GamePhase = {
-    PreGame = 1,
-    MainGame = 2,
-    GameOver = 3,
-}
-
 TileType = {
     Empty = 1,
     FloorEntry = 2,
@@ -120,36 +114,7 @@ function reset()
     g_detector = { cursor_val = 0, cursor_target = 0, next_scan = 0 }
 end
 
-function _update()
-    g_input = poll_input()
-
-    if g_game_phase == GamePhase.MainGame then
-        main_game_update(g_input)
-    elseif g_game_phase == GamePhase.PreGame then
-        pre_game_update(g_input)
-    elseif g_game_phase == GamePhase.GameOver then
-        game_over_update(g_input)
-    end
-end
-
-function pre_game_update(input)
-    local any_btn = (
-       input.btn_left or
-       input.btn_right or
-       input.btn_up or
-       input.btn_down or
-       input.btn_o or
-       input.btn_x)
-
-    g_game_timer_ui.update(g_maingame_tick_count)
-    if any_btn then
-        g_game_timer_ui.set_blinking(false)
-        g_game_phase = GamePhase.MainGame
-        music(0, 1000, 7)
-    end
-end
-
-function main_game_update(input)
+function _update_main_game(input)
     g_maingame_tick_count += 1
 
     -- update our in-game accelerated timer UI
@@ -462,7 +427,7 @@ function camera_follow_player(player, camera_ofs)
     camera_ofs.y = new_ofs.y - 64
 end
 
-function game_over_update(input)
+function _update_game_over(input)
     g_game_timer_ui.update(g_maingame_tick_count)
 
     if g_game_over_state.substate == "scroll_timer" then
@@ -489,16 +454,7 @@ function game_over_update(input)
     end
 end
 
-function _draw()
-    if g_game_phase == GamePhase.MainGame or
-       g_game_phase == GamePhase.PreGame then
-       draw_game()
-    elseif g_game_phase == GamePhase.GameOver then
-        draw_game_over()
-    end
-end
-
-function draw_game()
+function _draw_main_game()
     cls(Colors.BLACK)
 
     -- Set the camera view so that the world is draw relative to its position
@@ -593,7 +549,7 @@ function draw_game()
     g_game_timer_ui.draw(g_maingame_tick_count)
 end
 
-function draw_game_over()
+function _draw_game_over()
     cls(Colors.BLACK)
 
     if g_game_over_state.substate != "display_game_over_text" then
