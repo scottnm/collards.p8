@@ -46,6 +46,7 @@ function poll_input()
         btn_o_change = btnp(4),
         btn_x = btn(5),
         btn_x_change = btnp(5),
+        any_change = btnp() != 0,
     }
 end
 

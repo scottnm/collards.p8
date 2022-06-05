@@ -1,16 +1,7 @@
 -- title screen
 
 function _update_title_screen(input)
-    local any_btn = (
-       input.btn_left or
-       input.btn_right or
-       input.btn_up or
-       input.btn_down or
-       input.btn_o or
-       input.btn_x)
-
-    g_game_timer_ui.update(g_maingame_tick_count)
-    if any_btn then
+    if input.any_change then
         g_game_timer_ui.set_blinking(false)
         g_game_phase = GamePhase.MainGame
         music(0, 1000, 7)
