@@ -76,30 +76,6 @@ function _init_main_game()
 
     g_camera_player_offset = vec(0, 0)
 
-    g_anims = {
-        IdleDown = create_anim({34}, 10, 2, false),
-        WalkDown = create_anim({32, 34, 36}, 10, 2, false),
-        IdleUp = create_anim({40}, 10, 2, false),
-        WalkUp = create_anim({38, 40, 42}, 10, 2, false),
-        IdleRight = create_anim({66}, 10, 2, false),
-        WalkRight = create_anim({64, 66, 68}, 10, 2, false),
-        IdleLeft = create_anim({66}, 10, 2, true),
-        WalkLeft = create_anim({64, 66, 68}, 10, 2, true),
-        IdleUpRight = create_anim({8}, 10, 2, false),
-        WalkUpRight = create_anim({6, 8, 10}, 10, 2, false),
-        IdleDownRight = create_anim({2}, 10, 2, false),
-        WalkDownRight = create_anim({0, 2, 4}, 10, 2, false),
-        IdleUpLeft = create_anim({8}, 10, 2, true),
-        WalkUpLeft = create_anim({6, 8, 10}, 10, 2, true),
-        IdleDownLeft = create_anim({2}, 10, 2, true),
-        WalkDownLeft = create_anim({0, 2, 4}, 10, 2, true),
-        DigRight = create_anim({12, 12, 14}, 5, 2, false),
-        DigLeft = create_anim({12, 12, 14}, 5, 2, true),
-        DieLeft = create_anim({70, 70, 238}, 5, 2, true),
-        DieRight = create_anim({70, 70, 238}, 5, 2, false),
-        CollectItem = create_anim({46}, 1, 2, false),
-        BombFlash = create_anim({74, 74, 74, 74, 74, 74, 74, 75, 74, 74, 75, 74, 74, 75, 74}, 15, 1, false),
-    }
     g_game_timer_ui = make_ui_timer(on_ui_timer_shake, MAINGAME_TIME_LIMIT())
 
     g_maps = gen_maps(10)
