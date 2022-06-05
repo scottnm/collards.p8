@@ -61,7 +61,6 @@ function MAINGAME_TIME_LIMIT()
 end
 
 function _init_main_game()
-    pal() -- reset the palette
     g_banner = nil
     g_maingame_tick_count = 0
     g_game_over_state = nil
