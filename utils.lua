@@ -1,6 +1,5 @@
 -- utils.lua - common utils
 
--- Named colors enum
 Colors = {
     Black = 0,
     Navy = 1,
@@ -29,12 +28,11 @@ function rnd_incrange(lower, upper)
     return flr(rnd(upper - lower)) + lower
 end
 
--- clamp a value within a range inclusively
+-- clamp a value within a range
 function clamp(lower, value, upper)
     return mid(lower, value, upper)
 end
 
--- poll for next frame's input, compared to previous frame
 function poll_input()
     return {
         btn_left = btn(0),
@@ -82,4 +80,24 @@ end
 
 function restore_cam_state(c)
     camera(c.x, c.y)
+end
+
+function vec(x,y)
+    return { x=x, y=y }
+end
+
+function vec_copy(v)
+    return vec(v.x, v.y)
+end
+
+function vec_add(v1, v2)
+    return vec(v1.x + v2.x, v1.y + v2.y)
+end
+
+function vec_sub(v1, v2)
+    return vec(v1.x - v2.x, v1.y - v2.y)
+end
+
+function vec_scale(v, s)
+    return vec(v.x * s, v.y * s)
 end
