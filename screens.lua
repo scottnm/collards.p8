@@ -6,6 +6,10 @@ GamePhase = {
     GameOver = 3,
 }
 
+function _init()
+    set_phase(GamePhase.PreGame)
+end
+
 function _draw()
     if g_game_phase == GamePhase.PreGame then
         _draw_title_screen()
@@ -27,3 +31,13 @@ function _update()
     end
 end
 
+function set_phase(p)
+    if p == GamePhase.PreGame then
+        _init_title_screen()
+    elseif p == GamePhase.MainGame then
+        _init_main_game()
+    elseif p == GamePhase.GameOver then
+        _init_game_over()
+    end
+    g_game_phase = p
+end

@@ -1,13 +1,17 @@
 -- title screen
 
+function _init_title_screen()
+    --noop
+end
+
 function _update_title_screen(input)
+    --update_anim(g_player
     if input.any_change then
-        g_game_timer_ui.set_blinking(false)
-        g_game_phase = GamePhase.MainGame
-        music(0, 1000, 7)
+        set_phase(GamePhase.MainGame)
     end
 end
 
 function _draw_title_screen()
-    _draw_main_game() -- FIXME: tmp
+    -- _draw_main_game() -- FIXME: tmp
+    cls(Colors.Black)
 end

@@ -60,15 +60,10 @@ function MAINGAME_TIME_LIMIT()
     return 5 * 60 * 30 -- five minutes worth of ticks
 end
 
-function _init()
-    reset()
-end
-
-function reset()
+function _init_main_game()
     -- All global variables initialized here
     g_banner = nil
     g_maingame_tick_count = 0
-    g_game_phase = GamePhase.PreGame
     g_game_over_state = nil
     g_player = {
         book_state = BookState.NotFound,
@@ -106,12 +101,16 @@ function reset()
         BombFlash = create_anim({74, 74, 74, 74, 74, 74, 74, 75, 74, 74, 75, 74, 74, 75, 74}, 15, 1, false),
     }
     g_game_timer_ui = make_ui_timer(on_ui_timer_shake, MAINGAME_TIME_LIMIT())
-    g_game_timer_ui.set_blinking(true)
 
     g_maps = gen_maps(10)
     move_to_level(1, TileType.FloorEntry)
 
     g_detector = { cursor_val = 0, cursor_target = 0, next_scan = 0 }
+    music(0, 1000, 7)
+end
+
+function _init_game_over()
+    -- noop
 end
 
 function _update_main_game(input)
@@ -449,7 +448,7 @@ function _update_game_over(input)
         g_game_over_state.game_over_text_frame_cnt += 1
         local text_finished = g_game_over_state.game_over_text_frame_cnt >= g_game_over_state.game_over_text_final_frame_cnt
         if text_finished and (input.btn_x or input.btn_o) then
-            reset()
+            set_phase(GamePhase.PreGame)
         end
     end
 end
@@ -1448,6 +1447,6 @@ function handle_game_over(game_won)
         g_game_over_state.game_over_text = gen_lose_text()
     end
     g_game_timer_ui.set_blinking(true)
-    g_game_phase = GamePhase.GameOver
+    set_phase(GamePhase.GameOver)
     music(-1, 1000)
 end
