@@ -25,16 +25,16 @@ function modify_player_palette()
     for i=1,15 do pal(i, Colors.Black) end
 end
 
-function draw_title_text(color, x_ofs, y_ofs)
+function draw_title_text(color, x, y)
     pal(Colors.Maroon, color)
     local scale = 15
-    sspr_centered(g_title_letters.d, x_ofs + 0*scale, y_ofs, 2, 2, 1, false, false)
-    sspr_centered(g_title_letters.i, x_ofs + 1*scale, y_ofs, 2, 2, 1, false, false)
-    sspr_centered(g_title_letters.g, x_ofs + 2*scale, y_ofs, 2, 2, 1, false, false)
-    sspr_centered(g_title_letters.d, x_ofs + 3*scale, y_ofs, 2, 2, 1, false, false)
-    sspr_centered(g_title_letters.e, x_ofs + 4*scale, y_ofs, 2, 2, 1, false, false)
-    sspr_centered(g_title_letters.e, x_ofs + 5*scale, y_ofs, 2, 2, 1, false, false)
-    sspr_centered(g_title_letters.p, x_ofs + 6*scale, y_ofs, 2, 2, 1, false, false)
+    sspr_centered(g_title_letters.d, x + 0*scale, y, 2, 2, 1, false, false)
+    sspr_centered(g_title_letters.i, x + 1*scale, y, 2, 2, 1, false, false)
+    sspr_centered(g_title_letters.g, x + 2*scale, y, 2, 2, 1, false, false)
+    sspr_centered(g_title_letters.d, x + 3*scale, y, 2, 2, 1, false, false)
+    sspr_centered(g_title_letters.e, x + 4*scale, y, 2, 2, 1, false, false)
+    sspr_centered(g_title_letters.e, x + 5*scale, y, 2, 2, 1, false, false)
+    sspr_centered(g_title_letters.p, x + 6*scale, y, 2, 2, 1, false, false)
 end
 
 function _draw_title_screen()
