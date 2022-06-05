@@ -1,4 +1,4 @@
--- utils.lua - common utils
+-- utils
 
 Colors = {
     Black = 0,
@@ -23,12 +23,11 @@ function SCREEN_SIZE()
     return 128
 end
 
--- generate a random int from within a range inclusive
+-- generate random int from inclusive range
 function rnd_incrange(lower, upper)
     return flr(rnd(upper - lower)) + lower
 end
 
--- clamp a value within a range
 function clamp(lower, value, upper)
     return mid(lower, value, upper)
 end

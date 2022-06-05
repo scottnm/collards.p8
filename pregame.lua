@@ -1,4 +1,4 @@
--- pregame.lua -- logic for the titlescreen
+-- title screen
 
 function _update_title_screen(input)
     local any_btn = (

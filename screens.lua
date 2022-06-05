@@ -1,4 +1,4 @@
--- screens.lua - dispatch update and draw calls for each screen
+-- dispatch
 
 GamePhase = {
     PreGame = 1,

@@ -1,4 +1,4 @@
--- timer.lua - timers
+-- timers
 
 function make_ingame_timer(num_frames)
     local self = {

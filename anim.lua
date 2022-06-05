@@ -1,4 +1,4 @@
--- anim.lua - animation logic
+-- animation
 -- Based on scathe's anim function (thanks!) https://www.lexaloffle.com/bbs/?tid=3115&autoplay=1#pp
 
 function create_anim(frames, speed, tile_size, flip)

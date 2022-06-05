@@ -1,4 +1,4 @@
--- main.lua - main game logic
+-- main game
 
 TileType = {
     Empty = 1,
