@@ -36,7 +36,8 @@ function move_prop(p)
 end
 
 function prop_parallax(p)
-    return (35 + p.y - g_prop_base) / 70
+    t = ((p.y - g_prop_base) / 35)
+    return t * .5 + .5
 end
 
 function _update_title_screen(input)
