@@ -101,3 +101,24 @@ end
 function vec_scale(v, s)
     return vec(v.x * s, v.y * s)
 end
+
+function spr_centered(frame, x, y, tile_width, tile_height, flip_x, flip_y)
+    flip_x = flip_x or false
+    flip_y = flip_y or false
+    spr(frame, x - (tile_width * 8/2), y - (tile_height * 8/2), tile_width, tile_height, flip_x, flip_y)
+end
+
+function sspr_centered(frame, x, y, tile_width, tile_height, scale, flip_x, flip_y)
+    flip_x = flip_x or false
+    flip_y = flip_y or false
+    local sx = (frame % 16) * 8
+    local sy = flr(frame / 16) * 8
+    local sw = tile_width * 8
+    local sh = tile_height * 8
+    local scaled_sw = scale * sw
+    local scaled_sh = scale * sh
+    local pos_x = (x - scaled_sw/2)
+    local pos_y = (y - scaled_sh/2)
+    sspr(sx, sy, sw, sh, pos_x, pos_y, scaled_sw, scaled_sh, flip_x, flip_y)
+end
+
