@@ -121,4 +121,3 @@ function sspr_centered(frame, x, y, tile_width, tile_height, scale, flip_x, flip
     local pos_y = (y - scaled_sh/2)
     sspr(sx, sy, sw, sh, pos_x, pos_y, scaled_sw, scaled_sh, flip_x, flip_y)
 end
-
