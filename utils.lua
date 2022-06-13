@@ -121,3 +121,26 @@ function sspr_centered(frame, x, y, tile_width, tile_height, scale, flip_x, flip
     local pos_y = (y - scaled_sh/2)
     sspr(sx, sy, sw, sh, pos_x, pos_y, scaled_sw, scaled_sh, flip_x, flip_y)
 end
+
+function draw_text_roll(text, t, x, y, c)
+    c = c or Colors.White
+
+    local start_char = 1
+    local end_char = flr((#text) * t)
+
+    local newline_cnt = 0
+    local newline_overflow = 17
+    for i=1,end_char do
+        local next_char_idx = end_char - (i - 1) -- iterate in reverse
+        local next_char = sub(text, next_char_idx, next_char_idx)
+        if next_char == "\n" then
+            newline_cnt += 1
+            if newline_cnt >= newline_overflow then
+                start_char = next_char_idx + 1
+                break
+            end
+        end
+    end
+
+    print(sub(text, start_char, end_char), x, y, c)
+end

@@ -5,6 +5,9 @@ function _init_title_screen()
         pos = vec(64, 104),
         sprite_offset = vec(-8, -14),
     }
+    update_anim(g_player, g_anims.WalkLeft)
+
+    g_main_grave = nil
 
     g_letters = { d = 194, i = 196, g = 198, e = 200, p = 202 }
 
@@ -51,10 +54,10 @@ function _update_title_screen(input)
         update_anim(g_player, g_anims.WalkLeft)
         if input.btn_x_change or input.btn_o_change then
             g_subphase = "dismiss"
+            g_main_grave = make_prop(-10, 10)
+            g_dismiss_count = 60
         end
         foreach(g_props, move_prop)
-        g_main_grave = make_prop(-10, 10)
-        g_dismiss_count = 60
     elseif g_subphase == "dismiss" then
         update_anim(g_player, g_anims.WalkLeft)
         move_prop(g_main_grave)
@@ -62,15 +65,15 @@ function _update_title_screen(input)
         g_dismiss_count -= 1
         if g_dismiss_count == 0 then
             g_subphase = "textroll"
+            g_textroll_count = 40
         end
-        g_textroll_count = 40
     elseif g_subphase == "textroll" then
         update_anim(g_player, g_anims.IdleLeft)
         g_textroll_count -= 1
         if g_textroll_count == 0 then
             g_subphase = "fade"
+            g_fade_count = 40
         end
-        g_fade_count = 40
     elseif g_subphase == "fade" then
         g_fade_count -= 1
         if g_fade_count == 0 then
@@ -120,3 +123,6 @@ function _draw_title_screen()
    print("press \151/\142 to start", 25, 60, Colors.White)
    print(g_subphase, Colors.White)
 end
+
+-- NOTE TO SELF: BROKEN NOTES
+-- * when dying, some grave sprite shows as part of the flash. oops

@@ -547,27 +547,9 @@ function _draw_game_over()
         -- draw the in-game timer UI
         g_game_timer_ui.draw(g_maingame_tick_count)
     else
-        local game_over_text = g_game_over_state.game_over_text
+
         local rolled_text_ratio = (g_game_over_state.game_over_text_roll_spd * g_game_over_state.game_over_text_frame_cnt) / g_game_over_state.game_over_text_final_frame_cnt
-        local end_char = flr((#game_over_text) * rolled_text_ratio)
-
-        -- get the start char by reverse iterating
-        local start_char = 1
-        local newline_cnt = 0
-        local newline_overflow = 17
-        for i=1,end_char do
-            local next_char_idx = end_char - (i - 1) -- iterate in reverse
-            local next_char = sub(game_over_text, next_char_idx, next_char_idx)
-            if next_char == "\n" then
-                newline_cnt += 1
-                if newline_cnt >= newline_overflow then
-                    start_char = next_char_idx + 1
-                    break
-                end
-            end
-        end
-
-        print(sub(game_over_text, start_char, end_char), 10, 10, Colors.White)
+        draw_text_roll(g_game_over_state.game_over_text, rolled_text_ratio, 10, 10)
 
         -- draw the book UI
         draw_book_ui(g_player)
