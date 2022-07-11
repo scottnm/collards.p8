@@ -300,7 +300,7 @@ function interact_with_tile(tile)
     end
 
     if tile.type == TileType.FloorExit then
-        start_move_to_floor(g_map.level_id + 1, TileType.FloorEntry, Sfxs.UpStairs)
+        start_move_to_floor(g_map.level_id + 1, TileType.FloorEntry, Sfxs.DownStairs)
     elseif tile.type == TileType.FloorEntry then
         -- if we haven't found the book and we try to leave, warn the player
         if g_player.book_state == BookState.NotFound then
