@@ -153,8 +153,10 @@ function _draw_title_screen()
     draw_title_text(Colors.Tan, 21, 31)
     draw_title_text(Colors.Maroon, 22, 32)
 
-   print("press \151/\142 to start", 25, 60, Colors.White)
-   print(g_subphase, Colors.White)
+    if g_subphase == "wait" then
+        print("press \151/\142 to start", 25, 60, Colors.White)
+    end
+    print(g_subphase, Colors.White)
 end
 
 -- NOTE TO SELF: BROKEN NOTES
