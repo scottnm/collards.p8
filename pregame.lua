@@ -64,29 +64,36 @@ function _update_title_screen(input)
         foreach(g_props, move_prop)
         g_dismiss_count -= 1
         if g_dismiss_count == 0 then
-            g_subphase = "dig"
-            g_dig_count = 6
-        end
-    elseif g_subphase == "dig" then
-        update_anim(g_player, g_anims.DigLeft)
-        g_dig_count -= 1
-        if g_dig_count == 0 then
             g_subphase = "wait2"
-            g_wait2_count = 40
+            g_wait2_count = 60
         end
     elseif g_subphase == "wait2" then
         update_anim(g_player, g_anims.IdleLeft)
         g_wait2_count -= 1
         if g_wait2_count == 0 then
+            g_subphase = "dig"
+            g_dig_count = 36
+        end
+    elseif g_subphase == "dig" then
+        update_anim(g_player, g_anims.DigLeft)
+        g_dig_count -= 1
+        if g_dig_count == 0 then
+            g_subphase = "wait3"
+            g_wait3_count = 90
+        end
+    elseif g_subphase == "wait3" then
+        update_anim(g_player, g_anims.IdleLeft)
+        g_wait3_count -= 1
+        if g_wait3_count == 0 then
             g_subphase = "descend"
-            g_descend_count = 40
+            g_descend_count = 15
         end
     elseif g_subphase == "descend" then
         update_anim(g_player, g_anims.WalkDownLeft)
         g_descend_count -= 1
         if g_descend_count == 0 then
             g_subphase = "textroll"
-            g_textroll_count = 40
+            g_textroll_count = 90
         end
     elseif g_subphase == "textroll" then
         g_textroll_count -= 1
