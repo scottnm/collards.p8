@@ -90,7 +90,7 @@ function _update_title_screen(input)
         g_dig_count -= 1
         if g_dig_count == 0 then
             g_subphase = "wait3"
-            g_wait3_count = 90
+            g_wait3_count = 60
         end
     elseif g_subphase == "wait3" then
         update_anim(g_player, g_anims.IdleUpLeft)
@@ -98,7 +98,7 @@ function _update_title_screen(input)
         if g_wait3_count == 0 then
             sfx(Sfxs.DownStairs)
             g_subphase = "textroll"
-            g_textroll_count = 90
+            g_textroll_count = 1 -- FIXME: add the text rool
         end
     elseif g_subphase == "textroll" then
         g_textroll_count -= 1
