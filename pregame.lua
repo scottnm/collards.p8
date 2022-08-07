@@ -12,18 +12,7 @@ function _init_title_screen()
     g_start_prompt_y = 60
     g_title_dismiss_spd = 0.75
 
-    function chain_with_pauses(chunks, pause)
-        local s = ""
-        for i=1,(#chunks-1) do
-            t = chunks[i]
-            s = s..t
-            for j=1,pause do s = s.." " end
-            s = s.."\n\n"
-        end
-        return s..chunks[#chunks]
-    end
-
-    local intro_text = chain_with_pauses({
+    local intro_text = chain_text_with_pauses({
         "the family plot...", "they're taking it.", "paving it for a new distribution center.",
         "there's something buried there...", "granddaddy left it for you.", "it's with him\nunderground",
         "good luck.", "- granny \135",
@@ -61,8 +50,8 @@ function _init_title_screen()
     }
 end
 
+g_prop_base = 80
 function make_prop(x,y)
-    g_prop_base = 80
     return vec(x, y+g_prop_base)
 end
 

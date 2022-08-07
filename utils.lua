@@ -183,3 +183,14 @@ function split_text(text)
     end
     return split_text
 end
+
+function chain_text_with_pauses(chunks, pause)
+    local s = ""
+    for i=1,(#chunks-1) do
+        t = chunks[i]
+        s = s..t
+        for j=1,pause do s = s.." " end
+        s = s.."\n\n"
+    end
+    return s..chunks[#chunks]
+end
