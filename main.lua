@@ -36,29 +36,13 @@ BookState = {
 }
 
 -- constants
-function ISO_TILE_WIDTH()
-    return 32
-end
-
-function ISO_TILE_HEIGHT()
-    return 16
-end
-
-function MAX_TILE_LINE()
-    return 9
-end
-
-function MAX_CAMERA_DISTANCE_FROM_PLAYER()
-    return 20
-end
-
-function TOTAL_PAGE_COUNT()
-    return 10
-end
-
-function MAINGAME_TIME_LIMIT()
-    return 5 * 60 * 30 -- five minutes worth of ticks
-end
+function TILE_SIZE() return 16 end
+function ISO_TILE_WIDTH() return 32 end -- FIXME: still using?
+function ISO_TILE_HEIGHT() return 16 end
+function MAX_TILE_LINE() return 9 end
+function MAX_CAMERA_DISTANCE_FROM_PLAYER() return 20 end
+function TOTAL_PAGE_COUNT() return 10 end
+function MAINGAME_TIME_LIMIT() return 5 * 60 * 30  end -- five minutes worth of ticks
 
 function _init_main_game()
     g_banner = nil
@@ -746,7 +730,7 @@ function gen_maps(num_maps)
     -- set the trap cells in each map
     -- On each map, %30 of the tiles rounded down have traps
     for map in all(maps) do
-        local trap_cell_cnt = flr(map.iso_width * map.iso_width * 0.30)
+        local trap_cell_cnt = flr(map.size * map.size * 0.30)
         local trap_cells = select_random_empty_tiles({map}, trap_cell_cnt)
         for trap_cell in all(trap_cells) do
             map.cells[trap_cell.idx].tile = make_tile(false, TileType.Trap)
@@ -829,51 +813,37 @@ function gen_maps(num_maps)
     return maps
 end
 
-function gen_empty_level(level_id, map_iso_width)
+function gen_empty_level(level_id, map_size)
     -- create a new map
-    local next_map = {}
-    next_map.level_id = level_id
-    next_map.iso_width = map_iso_width
-    next_map.cells = {}
+    local next_map = {
+        level_id=level_id,
+        size=map_size,
+        cells={} }
 
     -- wrap the map with a ring of invisible fall tiles. adds 2 rows to each side
-    local visible_row_cnt = next_map.iso_width * 2 - 1
-    local row_cnt = visible_row_cnt + 4
-
-    -- initialize all the border cells as fall tiles and all the interior cells as empty
     local idx = 1
-    for row = 1,row_cnt do
-        local midpoint_row = flr((row_cnt + 1) / 2)
+    local size_with_border = map_size + 2
+    local mid = flr((size_with_border + 1) / 2)
+    for row=1,size_with_border do
+        local row_offset = (row - mid) * TILE_SIZE()
+        for col=1,size_with_border do
+            local col_offset = (col - mid) * TILE_SIZE()
 
-        local row_offset = (row - midpoint_row) * ISO_TILE_HEIGHT() / 2
-        local col_cnt = nil
-        if row <= midpoint_row then
-            col_cnt = row
-        else
-            col_cnt = 2 * midpoint_row - row
-        end
-
-        for col = 1,col_cnt do
             local tile = nil
+            local is_edge_tile = (row==1) or (row==size_with_border) or (col==1) or (col==size_with_border)
+            local tile_type = nil
 
-            local is_edge_tile = (col == 1) or (col == col_cnt)
+            -- initialize all the border cells as fall tiles and all the interior cells as empty
             if is_edge_tile then
-                tile = make_tile(true, TileType.Fall)
+                tile_type = TileType.Fall
             else
-                tile = make_tile(false, TileType.Empty)
+                tile_type = TileType.Empty
             end
-
-            local col_offset =
-                -1 * ((col_cnt/2) * ISO_TILE_WIDTH()) -- shift half the board width to the left
-                + (ISO_TILE_WIDTH()/2)                -- offset by half a tile width to move back into the center of the first tile
-                + ((col - 1)*ISO_TILE_WIDTH())        -- add a tile width for each subsequent tile
 
             local cell = {
                 idx = idx,
-                tile = tile,
-                pos = vec(
-                    SCREEN_SIZE()/2 + col_offset,
-                    SCREEN_SIZE()/2 + row_offset),
+                tile = make_tile(is_edge_tile, tile_type),
+                pos = vec(col_offset, row_offset),
                 collider = { radius = 4 }
             }
 
