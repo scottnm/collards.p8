@@ -422,7 +422,7 @@ function _update_game_over(input)
     elseif g_game_over_state.substate == "display_game_over_text" then
         g_game_over_state.game_over_text_frame_cnt += 1
         local text_finished = g_game_over_state.game_over_text_frame_cnt >= g_game_over_state.game_over_text_final_frame_cnt
-        if text_finished and (input.btn_x or input.btn_o) then
+        if text_finished and (input.btn_x_change or input.btn_o_change) then
             set_phase(GamePhase.PreGame)
         end
     end

@@ -7,6 +7,7 @@ GamePhase = {
 }
 
 function _init()
+    disable_input_repeat()
     _init_animations()
     set_phase(GamePhase.PreGame)
 end

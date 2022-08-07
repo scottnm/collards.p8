@@ -32,6 +32,10 @@ function clamp(lower, value, upper)
     return mid(lower, value, upper)
 end
 
+function disable_input_repeat()
+    poke(0x5f5c, 255) -- disable repeat so btnp only fires once for each held button press
+end
+
 function poll_input()
     return {
         btn_left = btn(0),
