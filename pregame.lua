@@ -92,7 +92,6 @@ function _update_title_screen(input)
         update_anim(g_player, g_anims.WalkLeft)
         if input.btn_x_change or input.btn_o_change then
             g_subphase = "dismiss1"
-            g_main_grave = make_prop(-10, 8)
             g_dismiss_count = 75
         end
         foreach(g_props, move_prop)
@@ -121,6 +120,7 @@ function _update_title_screen(input)
         if g_text_roll_hold == 0 then
             g_subphase = "graveentr"
             g_graveentr_count = 70
+            g_main_grave = make_prop(-10, 8)
         end
     elseif g_subphase == "graveentr" then
         update_anim(g_player, g_anims.WalkLeft)
@@ -199,6 +199,10 @@ function _draw_title_screen()
     end
     if g_main_grave != nil then
         add_sorted(ysort, g_main_grave, g_main_grave.y, function() draw_main_grave(g_main_grave) end)
+        if g_subphase == "wait3" then
+            spr(104, g_main_grave.x - 10, g_main_grave.y + 8, 4, 2, true)
+            rectfill(g_main_grave.x - 12, g_main_grave.y + 8, g_main_grave.x + 20, g_main_grave.y + 12, Colors.Brown)
+        end
     end
 
     for e in all(ysort) do e.on_iter() end -- run all draw procs
