@@ -36,10 +36,9 @@ function _init_title_screen()
     g_text_roll_length = #(intro_text) * 2
     g_text_roll_count = g_text_roll_length
 
-    g_letters = { d = 194, i = 196, g = 198, e = 200, p = 202 }
-
-    g_title = { g_letters.d, g_letters.i, g_letters.g,
-                g_letters.d, g_letters.e, g_letters.e, g_letters.p }
+    letters = { d = 194, i = 196, g = 198, e = 200, p = 202 }
+    g_title = { letters.d, letters.i, letters.g,
+                letters.d, letters.e, letters.e, letters.p }
 
     g_phase_timer = nil
     g_csphases = {
@@ -118,14 +117,19 @@ function _update_title_screen(input)
         g_text_roll_count -= 1
     end
 
+    phase_over = false
     if g_phase_timer != nil then
         g_phase_timer -= 1
+        phase_over = g_phase_timer == 0
+    else
+        phase_over = input.btn_x_change or input.btn_o_change
     end
 
-    phase_over = (g_phase_timer == 0) or (input.btn_x_change or input.btn_o_change)
     if phase_over then
-        if g_subphase < #g_csphases then
-            next_phase = g_csphases[g_subphase + 1]
+        g_subphase += 1
+        next_phase = g_csphases[g_subphase]
+        if next_phase != nil then
+            g_phase_timer = nil
             if next_phase.length != nil then
                 g_phase_timer = next_phase.length
             else
@@ -134,11 +138,12 @@ function _update_title_screen(input)
 
             if next_phase.name == "grave_entrance" then
                 g_main_grave = make_prop(-10, 8)
+            elseif next_phase.name == "blackout" then
+                sfx(Sfxs.DownStairs)
             end
         else
             set_phase(GamePhase.MainGame)
         end
-        g_subphase += 1
     end
 end
 
