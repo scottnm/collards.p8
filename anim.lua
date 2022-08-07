@@ -67,8 +67,8 @@ function _init_animations()
         WalkDownLeft = create_anim({0, 2, 4}, 10, 2, true),
         DigRight = create_anim({12, 12, 14}, 5, 2, false),
         DigLeft = create_anim({12, 12, 14}, 5, 2, true),
-        DieLeft = create_anim({70, 70, 238}, 5, 2, true),
-        DieRight = create_anim({70, 70, 238}, 5, 2, false),
+        DieLeft = create_anim({70, 70, 224}, 5, 2, true),
+        DieRight = create_anim({70, 70, 224}, 5, 2, false),
         CollectItem = create_anim({46}, 1, 2, false),
         BombFlash = create_anim({74, 74, 74, 74, 74, 74, 74, 75, 74, 74, 75, 74, 74, 75, 74}, 15, 1, false),
     }

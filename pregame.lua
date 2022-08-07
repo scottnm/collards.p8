@@ -200,10 +200,4 @@ function _draw_title_screen()
         local rolled_text_ratio = (g_text_roll_length - g_text_roll_count) / g_text_roll_length
         draw_text_roll(g_intro_text, rolled_text_ratio, 10, 10, nil, 6)
     end
-
-    print(phase.name, 0, 0, Colors.White)
 end
-
--- FIXME:
--- NOTE TO SELF: BROKEN NOTES
--- * when dying, some grave sprite shows as part of the flash. oops
