@@ -715,8 +715,7 @@ function gen_maps(num_maps)
         add(maps, gen_empty_level(i, map_size))
     end
 
-    -- Place the start and end tile on each map FIRST (we have to have these tiles. The rest aren't guaranteed to be
-    -- present on every layer)
+    -- Place the start and end tile on each map FIRST to guarantee there's room
     for map in all(maps) do
         -- set the start cell on this map.
         local player_start_iso_idx = select_random_empty_tile_idx_from_map(map)
@@ -864,27 +863,22 @@ function select_random_empty_tile_idx_from_map(map)
 end
 
 function select_random_empty_tiles(maps, select_count)
-    local empty_cell_cnt = 0
     local empty_cells = {}
     for map in all(maps) do
         for cell in all(map.cells) do
             if cell.tile.type == TileType.Empty then
-                add(empty_cells, { map = map, idx = cell.idx })
-                empty_cell_cnt += 1
+                add(empty_cells, { map=map, idx=cell.idx })
             end
         end
     end
 
     local selected_cells = {}
     for i=1,select_count do
-        local next_selected_empty_cell_idx = rnd_incrange(1, empty_cell_cnt)
-
         -- take the selected cell and update our collection so we have one less cell to select from
-        local next_selected_empty_cell = empty_cells[next_selected_empty_cell_idx]
-        empty_cells[next_selected_empty_cell_idx] = empty_cells[empty_cell_cnt]
-        empty_cells[empty_cell_cnt] = nil
-
-        add(selected_cells, next_selected_empty_cell)
+        local selected_cell_idx = rnd_incrange(1, #empty_cells)
+        local cell = empty_cells[selected_cell_idx]
+        empty_cells[selected_cell_idx] = deli(empty_cells)
+        add(selected_cells, selected_cell)
     end
 
     return selected_cells
