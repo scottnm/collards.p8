@@ -8,6 +8,9 @@ function _init_title_screen()
     update_anim(g_player, g_anims.WalkLeft)
 
     g_main_grave = nil
+    g_title_y = 31
+    g_start_prompt_y = 60
+    g_title_dismiss_spd = 0.75
 
     g_letters = { d = 194, i = 196, g = 198, e = 200, p = 202 }
 
@@ -61,15 +64,26 @@ function add_sorted(tbl, v, sort_val, on_iter)
 end
 
 function _update_title_screen(input)
+    -- FIXME: fix all of these phase names
     if g_subphase == "wait" then
         update_anim(g_player, g_anims.WalkLeft)
         if input.btn_x_change or input.btn_o_change then
-            g_subphase = "dismiss"
+            g_subphase = "dismiss1"
             g_main_grave = make_prop(-10, 8)
             g_dismiss_count = 75
         end
         foreach(g_props, move_prop)
-    elseif g_subphase == "dismiss" then
+    elseif g_subphase == "dismiss1" then
+        update_anim(g_player, g_anims.WalkLeft)
+        foreach(g_props, move_prop)
+        g_title_y -= g_title_dismiss_spd
+        g_start_prompt_y -= (g_title_dismiss_spd * 2)
+        g_dismiss_count -= 1
+        if g_dismiss_count == 0 then
+            g_subphase = "dismiss2"
+            g_dismiss_count = 30
+        end
+    elseif g_subphase == "dismiss2" then
         update_anim(g_player, g_anims.WalkLeft)
         move_prop(g_main_grave)
         foreach(g_props, move_prop)
@@ -150,13 +164,11 @@ function _draw_title_screen()
 
     for e in all(ysort) do e.on_iter() end -- run all draw procs
 
-    draw_title_text(Colors.Tan, 21, 31)
-    draw_title_text(Colors.Maroon, 22, 32)
+    print("press \151/\142 to start", 25, g_start_prompt_y, Colors.White)
+    draw_title_text(Colors.Tan, 21, g_title_y)
+    draw_title_text(Colors.Maroon, 22, g_title_y + 1)
 
-    if g_subphase == "wait" then
-        print("press \151/\142 to start", 25, 60, Colors.White)
-    end
-    print(g_subphase, Colors.White)
+    print(g_subphase, 0, 0, Colors.White)
 end
 
 -- NOTE TO SELF: BROKEN NOTES
