@@ -12,6 +12,25 @@ function _init_title_screen()
     g_start_prompt_y = 60
     g_title_dismiss_spd = 0.75
 
+    function chain_with_pauses(text_with_pauses)
+        local s = ""
+        for t in all(text_with_pauses) do
+            local p = ""
+            for i=1,t[2] do p = p.." " end
+            s = s .. t[1] .. p .. "\n"
+        end
+        return s
+    end
+
+    local intro_text = chain_with_pauses({
+        {"the family plot...", 5}, {"they're taking it.", 5}, {"paving it for a new distribution center.", 5},
+        {"there's something buried there...", 5}, {"granddaddy left it for you.", 5}, {"it's with him underground", 5},
+        {"find it.", 5}, {"good luck.", 50},
+    })
+
+    g_intro_text = split_text(intro_text)
+    g_text_roll_length = #(intro_text) * 2
+
     g_letters = { d = 194, i = 196, g = 198, e = 200, p = 202 }
 
     g_title = { g_letters.d, g_letters.i, g_letters.g,
@@ -80,15 +99,24 @@ function _update_title_screen(input)
         g_start_prompt_y -= (g_title_dismiss_spd * 2)
         g_dismiss_count -= 1
         if g_dismiss_count == 0 then
-            g_subphase = "dismiss2"
-            g_dismiss_count = 30
+            g_subphase = "textroll"
+            g_text_roll_count = g_text_roll_length
         end
-    elseif g_subphase == "dismiss2" then
+    elseif g_subphase == "textroll" then
         update_anim(g_player, g_anims.WalkLeft)
         move_prop(g_main_grave)
         foreach(g_props, move_prop)
-        g_dismiss_count -= 1
-        if g_dismiss_count == 0 then
+        g_text_roll_count -= 1
+        if g_text_roll_count == 0 then
+            g_subphase = "graveentr"
+            g_graveentr_count = 60
+        end
+    elseif g_subphase == "graveentr" then
+        update_anim(g_player, g_anims.WalkLeft)
+        move_prop(g_main_grave)
+        foreach(g_props, move_prop)
+        g_graveentr_count -= 1
+        if g_graveentr_count == 0 then
             g_subphase = "wait2"
             g_wait2_count = 60
         end
@@ -168,8 +196,14 @@ function _draw_title_screen()
     draw_title_text(Colors.Tan, 21, g_title_y)
     draw_title_text(Colors.Maroon, 22, g_title_y + 1)
 
+    if g_subphase == "textroll" then
+        local rolled_text_ratio = (g_text_roll_length - g_text_roll_count) / g_text_roll_length
+        draw_text_roll(g_intro_text, rolled_text_ratio, 10, 10, nil, 6)
+    end
+
     print(g_subphase, 0, 0, Colors.White)
 end
 
+-- FIXME:
 -- NOTE TO SELF: BROKEN NOTES
 -- * when dying, some grave sprite shows as part of the flash. oops

@@ -549,7 +549,7 @@ function _draw_game_over()
     else
 
         local rolled_text_ratio = (g_game_over_state.game_over_text_roll_spd * g_game_over_state.game_over_text_frame_cnt) / g_game_over_state.game_over_text_final_frame_cnt
-        draw_text_roll(g_game_over_state.game_over_text, rolled_text_ratio, 10, 10)
+        draw_text_roll(g_game_over_state.game_over_text, rolled_text_ratio, 10, 10, nil, 17)
 
         -- draw the book UI
         draw_book_ui(g_player)
@@ -1299,46 +1299,6 @@ function new_bomb(pos, on_explosion_start)
         done = done,
         get_explosions = get_explosions
     }
-end
-
-function split_text(text)
-    local split_text = ""
-    local chars_processed = 0
-    while chars_processed < #text do
-        local end_char = min(chars_processed + 1 + 25, #text)
-        local next_chunk = nil
-
-        if end_char == #text then
-            next_chunk = sub(text, chars_processed + 1)
-        else
-            local new_line_idx = nil
-            for i=(chars_processed+1),end_char do
-                if sub(text, i, i) == "\n" then
-                    new_line_idx = i
-                end
-            end
-
-            if new_line_idx != nil then
-                -- if there's a new line. process up to but not including that newline char
-                -- include an extra space at the end of this chunk so that we skip past the
-                -- newline when updating chars_processed
-                next_chunk = sub(text, chars_processed + 1, new_line_idx - 1).." "
-            else
-                while sub(text, end_char, end_char) != " " do
-                    end_char -= 1
-                end
-                next_chunk = sub(text, chars_processed + 1, end_char)
-            end
-        end
-
-        if split_text == "" then
-            split_text = next_chunk
-        else
-            split_text = split_text.."\n"..next_chunk
-        end
-        chars_processed += #next_chunk
-    end
-    return split_text
 end
 
 function gen_lose_text()
