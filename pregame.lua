@@ -120,7 +120,7 @@ function _update_title_screen(input)
         g_text_roll_hold -= 1
         if g_text_roll_hold == 0 then
             g_subphase = "graveentr"
-            g_graveentr_count = 60
+            g_graveentr_count = 70
         end
     elseif g_subphase == "graveentr" then
         update_anim(g_player, g_anims.WalkLeft)
