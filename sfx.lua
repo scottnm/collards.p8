@@ -1,4 +1,4 @@
--- sfx.lua - sfx & music helpers
+-- sfx
 
 Sfxs = {
     Dig = 1,

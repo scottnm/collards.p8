@@ -7,8 +7,11 @@ functionality. I currently prefer this flow for multi-file lua stuff rather than
 Param(
     [Parameter(Mandatory=$true)][string]$Path,
     [Parameter(Mandatory=$false)][string]$PrototypeLabel = "1",
-    [Parameter(Mandatory=$false)][string]$OutputCartName
+    [Parameter(Mandatory=$false)][string]$OutputCartName,
+    [Parameter(Mandatory=$false)][switch]$Minify,
+    [Parameter(Mandatory=$false)][string]$ReleaseName
 )
+
 
 if (!$OutputCartName)
 {
@@ -45,4 +48,20 @@ for ($i = 0; $i -lt $cartIncludes.Matches.Count; $i++)
 $cmd = "p8tool build $OutputCartName --lua $tmpLuaFile"
 Write-Host -ForegroundColor Yellow $cmd
 Invoke-Expression -command $cmd
+if ($Minify)
+{
+    $cmd = "p8tool luamin $OutputCartName"
+    Write-Host -ForegroundColor Yellow $cmd
+    Invoke-Expression -command $cmd
+    $minCartName = (Get-Item $OutputCartName).BaseName + "_fmt.p8"
+    mv $minCartName $OutputCartName -force
+}
 rm $tmpLuaFile
+
+if ($ReleaseName)
+{
+    $releaseDir = "$PSScriptRoot\releases\$ReleaseName"
+    rm $releaseDir -rec -ErrorAction SilentlyContinue
+    mkdir $releaseDir
+    mv $OutputCartName $releaseDir
+}

@@ -1,10 +1,4 @@
--- main.lua - main game logic
-
-GamePhase = {
-    PreGame = 1,
-    MainGame = 2,
-    GameOver = 3,
-}
+-- main game
 
 TileType = {
     Empty = 1,
@@ -66,15 +60,9 @@ function MAINGAME_TIME_LIMIT()
     return 5 * 60 * 30 -- five minutes worth of ticks
 end
 
-function _init()
-    reset()
-end
-
-function reset()
-    -- All global variables initialized here
+function _init_main_game()
     g_banner = nil
     g_maingame_tick_count = 0
-    g_game_phase = GamePhase.PreGame
     g_game_over_state = nil
     g_player = {
         book_state = BookState.NotFound,
@@ -87,69 +75,20 @@ function reset()
 
     g_camera_player_offset = vec(0, 0)
 
-    g_anims = {
-        IdleDown = create_anim({34}, 10, 2, false),
-        WalkDown = create_anim({32, 34, 36}, 10, 2, false),
-        IdleUp = create_anim({40}, 10, 2, false),
-        WalkUp = create_anim({38, 40, 42}, 10, 2, false),
-        IdleRight = create_anim({66}, 10, 2, false),
-        WalkRight = create_anim({64, 66, 68}, 10, 2, false),
-        IdleLeft = create_anim({66}, 10, 2, true),
-        WalkLeft = create_anim({64, 66, 68}, 10, 2, true),
-        IdleUpRight = create_anim({8}, 10, 2, false),
-        WalkUpRight = create_anim({6, 8, 10}, 10, 2, false),
-        IdleDownRight = create_anim({2}, 10, 2, false),
-        WalkDownRight = create_anim({0, 2, 4}, 10, 2, false),
-        IdleUpLeft = create_anim({8}, 10, 2, true),
-        WalkUpLeft = create_anim({6, 8, 10}, 10, 2, true),
-        IdleDownLeft = create_anim({2}, 10, 2, true),
-        WalkDownLeft = create_anim({0, 2, 4}, 10, 2, true),
-        DigRight = create_anim({12, 12, 14}, 5, 2, false),
-        DigLeft = create_anim({12, 12, 14}, 5, 2, true),
-        DieLeft = create_anim({70, 70, 238}, 5, 2, true),
-        DieRight = create_anim({70, 70, 238}, 5, 2, false),
-        CollectItem = create_anim({46}, 1, 2, false),
-        BombFlash = create_anim({74, 74, 74, 74, 74, 74, 74, 75, 74, 74, 75, 74, 74, 75, 74}, 15, 1, false),
-    }
     g_game_timer_ui = make_ui_timer(on_ui_timer_shake, MAINGAME_TIME_LIMIT())
-    g_game_timer_ui.set_blinking(true)
 
     g_maps = gen_maps(10)
     move_to_level(1, TileType.FloorEntry)
 
     g_detector = { cursor_val = 0, cursor_target = 0, next_scan = 0 }
+    music(0, 1000, 7)
 end
 
-function _update()
-    g_input = poll_input()
-
-    if g_game_phase == GamePhase.MainGame then
-        main_game_update(g_input)
-    elseif g_game_phase == GamePhase.PreGame then
-        pre_game_update(g_input)
-    elseif g_game_phase == GamePhase.GameOver then
-        game_over_update(g_input)
-    end
+function _init_game_over()
+    -- noop
 end
 
-function pre_game_update(input)
-    local any_btn = (
-       input.btn_left or
-       input.btn_right or
-       input.btn_up or
-       input.btn_down or
-       input.btn_o or
-       input.btn_x)
-
-    g_game_timer_ui.update(g_maingame_tick_count)
-    if any_btn then
-        g_game_timer_ui.set_blinking(false)
-        g_game_phase = GamePhase.MainGame
-        music(0, 1000, 7)
-    end
-end
-
-function main_game_update(input)
+function _update_main_game(input)
     g_maingame_tick_count += 1
 
     -- update our in-game accelerated timer UI
@@ -361,7 +300,7 @@ function interact_with_tile(tile)
     end
 
     if tile.type == TileType.FloorExit then
-        start_move_to_floor(g_map.level_id + 1, TileType.FloorEntry, Sfxs.UpStairs)
+        start_move_to_floor(g_map.level_id + 1, TileType.FloorEntry, Sfxs.DownStairs)
     elseif tile.type == TileType.FloorEntry then
         -- if we haven't found the book and we try to leave, warn the player
         if g_player.book_state == BookState.NotFound then
@@ -462,7 +401,7 @@ function camera_follow_player(player, camera_ofs)
     camera_ofs.y = new_ofs.y - 64
 end
 
-function game_over_update(input)
+function _update_game_over(input)
     g_game_timer_ui.update(g_maingame_tick_count)
 
     if g_game_over_state.substate == "scroll_timer" then
@@ -484,21 +423,12 @@ function game_over_update(input)
         g_game_over_state.game_over_text_frame_cnt += 1
         local text_finished = g_game_over_state.game_over_text_frame_cnt >= g_game_over_state.game_over_text_final_frame_cnt
         if text_finished and (input.btn_x or input.btn_o) then
-            reset()
+            set_phase(GamePhase.PreGame)
         end
     end
 end
 
-function _draw()
-    if g_game_phase == GamePhase.MainGame or
-       g_game_phase == GamePhase.PreGame then
-       draw_game()
-    elseif g_game_phase == GamePhase.GameOver then
-        draw_game_over()
-    end
-end
-
-function draw_game()
+function _draw_main_game()
     cls(Colors.BLACK)
 
     -- Set the camera view so that the world is draw relative to its position
@@ -593,7 +523,7 @@ function draw_game()
     g_game_timer_ui.draw(g_maingame_tick_count)
 end
 
-function draw_game_over()
+function _draw_game_over()
     cls(Colors.BLACK)
 
     if g_game_over_state.substate != "display_game_over_text" then
@@ -617,27 +547,9 @@ function draw_game_over()
         -- draw the in-game timer UI
         g_game_timer_ui.draw(g_maingame_tick_count)
     else
-        local game_over_text = g_game_over_state.game_over_text
+
         local rolled_text_ratio = (g_game_over_state.game_over_text_roll_spd * g_game_over_state.game_over_text_frame_cnt) / g_game_over_state.game_over_text_final_frame_cnt
-        local end_char = flr((#game_over_text) * rolled_text_ratio)
-
-        -- get the start char by reverse iterating
-        local start_char = 1
-        local newline_cnt = 0
-        local newline_overflow = 17
-        for i=1,end_char do
-            local next_char_idx = end_char - (i - 1) -- iterate in reverse
-            local next_char = sub(game_over_text, next_char_idx, next_char_idx)
-            if next_char == "\n" then
-                newline_cnt += 1
-                if newline_cnt >= newline_overflow then
-                    start_char = next_char_idx + 1
-                    break
-                end
-            end
-        end
-
-        print(sub(game_over_text, start_char, end_char), 10, 10, Colors.White)
+        draw_text_roll(g_game_over_state.game_over_text, rolled_text_ratio, 10, 10, nil, 17)
 
         -- draw the book UI
         draw_book_ui(g_player)
@@ -809,27 +721,6 @@ function draw_banner(text, fg_color, bg_color)
 
     restore_cam_state(cam_state)
 end
-
-function spr_centered(frame, x, y, tile_width, tile_height, flip_x, flip_y)
-    flip_x = flip_x or false
-    flip_y = flip_y or false
-    spr(frame, x - (tile_width * 8/2), y - (tile_height * 8/2), tile_width, tile_height, flip_x, flip_y)
-end
-
-function sspr_centered(frame, x, y, tile_width, tile_height, scale, flip_x, flip_y)
-    flip_x = flip_x or false
-    flip_y = flip_y or false
-    local sx = (frame % 16) * 8
-    local sy = flr(frame / 16) * 8
-    local sw = tile_width * 8
-    local sh = tile_height * 8
-    local scaled_sw = scale * sw
-    local scaled_sh = scale * sh
-    local pos_x = (x - scaled_sw/2)
-    local pos_y = (y - scaled_sh/2)
-    sspr(sx, sy, sw, sh, pos_x, pos_y, scaled_sw, scaled_sh, flip_x, flip_y)
-end
-
 
 function gen_maps(num_maps)
     local maps = {}
@@ -1410,46 +1301,6 @@ function new_bomb(pos, on_explosion_start)
     }
 end
 
-function split_text(text)
-    local split_text = ""
-    local chars_processed = 0
-    while chars_processed < #text do
-        local end_char = min(chars_processed + 1 + 25, #text)
-        local next_chunk = nil
-
-        if end_char == #text then
-            next_chunk = sub(text, chars_processed + 1)
-        else
-            local new_line_idx = nil
-            for i=(chars_processed+1),end_char do
-                if sub(text, i, i) == "\n" then
-                    new_line_idx = i
-                end
-            end
-
-            if new_line_idx != nil then
-                -- if there's a new line. process up to but not including that newline char
-                -- include an extra space at the end of this chunk so that we skip past the
-                -- newline when updating chars_processed
-                next_chunk = sub(text, chars_processed + 1, new_line_idx - 1).." "
-            else
-                while sub(text, end_char, end_char) != " " do
-                    end_char -= 1
-                end
-                next_chunk = sub(text, chars_processed + 1, end_char)
-            end
-        end
-
-        if split_text == "" then
-            split_text = next_chunk
-        else
-            split_text = split_text.."\n"..next_chunk
-        end
-        chars_processed += #next_chunk
-    end
-    return split_text
-end
-
 function gen_lose_text()
     return "you were unable to make\nyour way to the bottom\nof the grave in time.\n\nyour family's most\ncherished heirloom is\nlost. gone forever.\n\nthis is unacceptable.\nyou'll have to try again.\n\nx/c - to reset"
 end
@@ -1492,6 +1343,6 @@ function handle_game_over(game_won)
         g_game_over_state.game_over_text = gen_lose_text()
     end
     g_game_timer_ui.set_blinking(true)
-    g_game_phase = GamePhase.GameOver
+    set_phase(GamePhase.GameOver)
     music(-1, 1000)
 end

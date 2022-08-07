@@ -1,4 +1,4 @@
--- dbg.lua - dbg helpers
+-- dbg helpers
 
 -- e.g. dbg_display_frame_stats({ x = 80, y = 80 })
 function dbg_display_frame_stats(pos)

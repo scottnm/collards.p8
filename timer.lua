@@ -1,4 +1,4 @@
--- timer.lua - timers
+-- timers
 
 function make_ingame_timer(num_frames)
     local self = {
@@ -29,7 +29,7 @@ end
 
 function make_ui_timer(on_shake, total_ticks)
     local self = {
-        blinking = true,
+        blinking = false,
         blink_ticks = 0,
         blink_period = 25,
         real_time_ticks = nil,
