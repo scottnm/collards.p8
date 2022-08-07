@@ -28,19 +28,32 @@ function _init_title_screen()
 
     local intro_text = chain_with_pauses({
         "the family plot...", "they're taking it.", "paving it for a new distribution center.",
-        "there's something buried there...", "granddaddy left it for you.", "it's with him...",
-        "...underground.", "find it.", "- granny \135",
+        "there's something buried there...", "granddaddy left it for you.", "it's with him\nunderground",
+        "good luck.", "- granny \135",
     }, 5)
 
     g_intro_text = split_text(intro_text)
     g_text_roll_length = #(intro_text) * 2
+    g_text_roll_count = g_text_roll_length
 
     g_letters = { d = 194, i = 196, g = 198, e = 200, p = 202 }
 
     g_title = { g_letters.d, g_letters.i, g_letters.g,
                 g_letters.d, g_letters.e, g_letters.e, g_letters.p }
 
-    g_subphase = "wait"
+    g_phase_timer = nil
+    g_csphases = {
+        { name="wait" },
+        { name="dismiss_title", length=75 },
+        { name="text_roll", length=g_text_roll_count },
+        { name="text_roll_hold", length=60 },
+        { name="grave_entrance", length=70 },
+        { name="wait_at_grave", length=60, stop_moving=true, player_anim=g_anims.IdleUpLeft },
+        { name="dig_at_grave", length=36, stop_moving=true, player_anim=g_anims.DigLeft },
+        { name="wait_at_stairs", length=60, stop_moving=true, player_anim=g_anims.IdleUpLeft },
+        { name="blackout", length=30 },
+    }
+    g_subphase = 1
 
     g_props = {
         make_prop(-130, 0),
@@ -87,79 +100,45 @@ function add_sorted(tbl, v, sort_val, on_iter)
 end
 
 function _update_title_screen(input)
-    -- FIXME: fix all of these phase names
-    if g_subphase == "wait" then
-        update_anim(g_player, g_anims.WalkLeft)
-        if input.btn_x_change or input.btn_o_change then
-            g_subphase = "dismiss1"
-            g_dismiss_count = 75
+    local phase = g_csphases[g_subphase]
+    if phase == nil then return end
+
+    update_anim(g_player, phase.player_anim or g_anims.WalkLeft)
+    if not phase.stop_moving then
+        foreach(g_props, move_prop)
+        if g_main_grave != nil then
+            move_prop(g_main_grave)
         end
-        foreach(g_props, move_prop)
-    elseif g_subphase == "dismiss1" then
-        update_anim(g_player, g_anims.WalkLeft)
-        foreach(g_props, move_prop)
+    end
+
+    if phase.name == "dismiss_title" then
         g_title_y -= g_title_dismiss_spd
         g_start_prompt_y -= (g_title_dismiss_spd * 2)
-        g_dismiss_count -= 1
-        if g_dismiss_count == 0 then
-            g_subphase = "textroll"
-            g_text_roll_count = g_text_roll_length
-        end
-    elseif g_subphase == "textroll" then
-        update_anim(g_player, g_anims.WalkLeft)
-        foreach(g_props, move_prop)
+    elseif phase.name == "text_roll" then
         g_text_roll_count -= 1
-        if g_text_roll_count == 0 then
-            g_subphase = "textrollhold"
-            g_text_roll_hold = 60
+    end
+
+    if g_phase_timer != nil then
+        g_phase_timer -= 1
+    end
+
+    phase_over = (g_phase_timer == 0) or (input.btn_x_change or input.btn_o_change)
+    if phase_over then
+        if g_subphase < #g_csphases then
+            next_phase = g_csphases[g_subphase + 1]
+            if next_phase.length != nil then
+                g_phase_timer = next_phase.length
+            else
+                g_phase_timer = nil
+            end
+
+            if next_phase.name == "grave_entrance" then
+                g_main_grave = make_prop(-10, 8)
+            end
+        else
+            set_phase(GamePhase.MainGame)
         end
-    elseif g_subphase == "textrollhold" then
-        update_anim(g_player, g_anims.WalkLeft)
-        foreach(g_props, move_prop)
-        g_text_roll_hold -= 1
-        if g_text_roll_hold == 0 then
-            g_subphase = "graveentr"
-            g_graveentr_count = 70
-            g_main_grave = make_prop(-10, 8)
-        end
-    elseif g_subphase == "graveentr" then
-        update_anim(g_player, g_anims.WalkLeft)
-        move_prop(g_main_grave)
-        foreach(g_props, move_prop)
-        g_graveentr_count -= 1
-        if g_graveentr_count == 0 then
-            g_subphase = "wait2"
-            g_wait2_count = 60
-        end
-    elseif g_subphase == "wait2" then
-        update_anim(g_player, g_anims.IdleUpLeft)
-        g_wait2_count -= 1
-        if g_wait2_count == 0 then
-            g_subphase = "dig"
-            g_dig_count = 36
-        end
-    elseif g_subphase == "dig" then
-        update_anim(g_player, g_anims.DigLeft)
-        g_dig_count -= 1
-        if g_dig_count == 0 then
-            g_subphase = "wait3"
-            g_wait3_count = 60
-        end
-    elseif g_subphase == "wait3" then
-        update_anim(g_player, g_anims.IdleUpLeft)
-        g_wait3_count -= 1
-        if g_wait3_count == 0 then
-            sfx(Sfxs.DownStairs)
-            g_subphase = "blackout"
-            g_blackout_count = 30
-        end
-    elseif g_subphase == "blackout" then
-        g_blackout_count -= 1
-        if g_blackout_count == 0 then
-            g_subphase = "done"
-        end
-    elseif g_subphase == "done" then
-        set_phase(GamePhase.MainGame)
+        g_subphase += 1
     end
 end
 
@@ -186,7 +165,8 @@ end
 function _draw_title_screen()
     cls(Colors.Black)
 
-    if g_subphase == "blackout" or g_subphase == "done" then
+    local phase = g_csphases[g_subphase]
+    if phase == nil or phase.name == "blackout" then
         return
     end
 
@@ -199,7 +179,7 @@ function _draw_title_screen()
     end
     if g_main_grave != nil then
         add_sorted(ysort, g_main_grave, g_main_grave.y, function() draw_main_grave(g_main_grave) end)
-        if g_subphase == "wait3" then
+        if phase.name == "wait_at_stairs" then
             spr(104, g_main_grave.x - 10, g_main_grave.y + 8, 4, 2, true)
             rectfill(g_main_grave.x - 12, g_main_grave.y + 8, g_main_grave.x + 20, g_main_grave.y + 12, Colors.Brown)
         end
@@ -211,12 +191,12 @@ function _draw_title_screen()
     draw_title_text(Colors.Tan, 21, g_title_y)
     draw_title_text(Colors.Maroon, 22, g_title_y + 1)
 
-    if g_subphase == "textroll" or g_subphase == "textrollhold" then
+    if phase.name == "text_roll" or phase.name == "text_roll_hold" then
         local rolled_text_ratio = (g_text_roll_length - g_text_roll_count) / g_text_roll_length
         draw_text_roll(g_intro_text, rolled_text_ratio, 10, 10, nil, 6)
     end
 
-    print(g_subphase, 0, 0, Colors.White)
+    print(phase.name, 0, 0, Colors.White)
 end
 
 -- FIXME:
