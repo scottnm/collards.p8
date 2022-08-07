@@ -112,7 +112,7 @@ function _update_title_screen(input)
         g_text_roll_count -= 1
         if g_text_roll_count == 0 then
             g_subphase = "textrollhold"
-            g_text_roll_hold = 30
+            g_text_roll_hold = 60
         end
     elseif g_subphase == "textrollhold" then
         update_anim(g_player, g_anims.WalkLeft)
