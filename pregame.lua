@@ -14,16 +14,13 @@ function _init_title_screen()
 
     function chain_with_pauses(chunks, pause)
         local s = ""
-        for i=1,#chunks do
-            last = i == #chunks
+        for i=1,(#chunks-1) do
             t = chunks[i]
-            p = pause
-            if last then p = 0 end
             s = s..t
-            for j=1,p do s = s.." " end
-            if not last then s = s.."\n\n" end
+            for j=1,pause do s = s.." " end
+            s = s.."\n\n"
         end
-        return s
+        return s..chunks[#chunks]
     end
 
     local intro_text = chain_with_pauses({
