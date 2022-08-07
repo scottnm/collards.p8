@@ -12,21 +12,25 @@ function _init_title_screen()
     g_start_prompt_y = 60
     g_title_dismiss_spd = 0.75
 
-    function chain_with_pauses(text_with_pauses)
+    function chain_with_pauses(chunks, pause)
         local s = ""
-        for t in all(text_with_pauses) do
-            local p = ""
-            for i=1,t[2] do p = p.." " end
-            s = s .. t[1] .. p .. "\n"
+        for i=1,#chunks do
+            last = i == #chunks
+            t = chunks[i]
+            p = pause
+            if last then p = 0 end
+            s = s..t
+            for j=1,p do s = s.." " end
+            if not last then s = s.."\n\n" end
         end
         return s
     end
 
     local intro_text = chain_with_pauses({
-        {"the family plot...", 5}, {"they're taking it.", 5}, {"paving it for a new distribution center.", 5},
-        {"there's something buried there...", 5}, {"granddaddy left it for you.", 5}, {"it's with him underground", 5},
-        {"find it.", 5}, {"good luck.", 50},
-    })
+        "the family plot...", "they're taking it.", "paving it for a new distribution center.",
+        "there's something buried there...", "granddaddy left it for you.", "it's with him...",
+        "...underground.", "find it.", "- granny \135",
+    }, 5)
 
     g_intro_text = split_text(intro_text)
     g_text_roll_length = #(intro_text) * 2
@@ -104,10 +108,17 @@ function _update_title_screen(input)
         end
     elseif g_subphase == "textroll" then
         update_anim(g_player, g_anims.WalkLeft)
-        move_prop(g_main_grave)
         foreach(g_props, move_prop)
         g_text_roll_count -= 1
         if g_text_roll_count == 0 then
+            g_subphase = "textrollhold"
+            g_text_roll_hold = 30
+        end
+    elseif g_subphase == "textrollhold" then
+        update_anim(g_player, g_anims.WalkLeft)
+        foreach(g_props, move_prop)
+        g_text_roll_hold -= 1
+        if g_text_roll_hold == 0 then
             g_subphase = "graveentr"
             g_graveentr_count = 60
         end
@@ -139,12 +150,12 @@ function _update_title_screen(input)
         g_wait3_count -= 1
         if g_wait3_count == 0 then
             sfx(Sfxs.DownStairs)
-            g_subphase = "textroll"
-            g_textroll_count = 1 -- FIXME: add the text rool
+            g_subphase = "blackout"
+            g_blackout_count = 30
         end
-    elseif g_subphase == "textroll" then
-        g_textroll_count -= 1
-        if g_textroll_count == 0 then
+    elseif g_subphase == "blackout" then
+        g_blackout_count -= 1
+        if g_blackout_count == 0 then
             g_subphase = "done"
         end
     elseif g_subphase == "done" then
@@ -175,7 +186,7 @@ end
 function _draw_title_screen()
     cls(Colors.Black)
 
-    if g_subphase == "fade" or g_subphase == "done" then
+    if g_subphase == "blackout" or g_subphase == "done" then
         return
     end
 
@@ -196,7 +207,7 @@ function _draw_title_screen()
     draw_title_text(Colors.Tan, 21, g_title_y)
     draw_title_text(Colors.Maroon, 22, g_title_y + 1)
 
-    if g_subphase == "textroll" then
+    if g_subphase == "textroll" or g_subphase == "textrollhold" then
         local rolled_text_ratio = (g_text_roll_length - g_text_roll_count) / g_text_roll_length
         draw_text_roll(g_intro_text, rolled_text_ratio, 10, 10, nil, 6)
     end
