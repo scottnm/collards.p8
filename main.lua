@@ -715,22 +715,19 @@ function gen_maps(num_maps)
         add(maps, gen_empty_level(i, map_size))
     end
 
-    -- Place the start and end tile on each map FIRST to guarantee there's room
+    -- Place the start and finish tile on each map FIRST to guarantee there's room
     for map in all(maps) do
-        -- set the start cell on this map.
-        local player_start_iso_idx = select_random_empty_tile_idx_from_map(map)
-        map.cells[player_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
+        local player_start_idx = select_random_empty_tile_idx_from_map(map)
+        map.cells[player_start_idx].tile = make_tile(true, TileType.FloorEntry)
 
-        -- set the finish cell on this map.
         map.finish_cell_idx = select_random_empty_tile_idx_from_map(map)
         map.cells[map.finish_cell_idx].tile = make_tile(false, TileType.FloorExit)
     end
 
-    -- set the trap cells in each map
-    -- On each map, %30 of the tiles rounded down have traps
+    -- Set the trap cells on each map. On each map ~%30 of tiles have traps.
     for map in all(maps) do
-        local trap_cell_cnt = flr(map.size * map.size * 0.30)
-        local trap_cells = select_random_empty_tiles({map}, trap_cell_cnt)
+        local trap_cnt = flr(map.size * map.size * 0.30)
+        local trap_cells = select_random_empty_tiles({map}, trap_cnt)
         for trap_cell in all(trap_cells) do
             map.cells[trap_cell.idx].tile = make_tile(false, TileType.Trap)
         end
@@ -738,8 +735,8 @@ function gen_maps(num_maps)
 
     -- set the bomb item cells
     -- There are a total of 10 bombs across the whole game
-    local bomb_cell_cnt = 10
-    local bomb_cells = select_random_empty_tiles(maps, bomb_cell_cnt)
+    local bomb_cnt = 10
+    local bomb_cells = select_random_empty_tiles(maps, bomb_cnt)
     for bomb_cell in all(bomb_cells) do
         bomb_cell.map.cells[bomb_cell.idx].tile = make_tile(false, TileType.BombItem)
     end
