@@ -58,6 +58,8 @@ function world_to_iso(wp)
 
     -- scale
     ip.x *= 2
+
+    return ip
 end
 
 function _init_main_game()

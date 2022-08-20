@@ -14,6 +14,7 @@ function world_to_iso(wp)
 
     -- scale
     ip.x *= 2
+    return ip
 end
 
 function _init()
@@ -23,9 +24,9 @@ function _init()
 end
 
 function _draw()
-    -- local draw_pos = world_to_iso(g_player.pos)
     cls(Colors.Black)
-    local draw_pos = vec(64,64)
+    local draw_pos = world_to_iso(g_player.pos)
+    -- local draw_pos = vec(64,64)
     rectfill(draw_pos.x, draw_pos.y, draw_pos.x+10, draw_pos.y+10, Colors.Red)
 end
 
