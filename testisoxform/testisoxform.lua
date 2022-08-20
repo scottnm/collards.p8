@@ -25,37 +25,15 @@ function print_world_space_test()
 end
 
 function world_to_iso(wp)
-    -- SRT / TRS
-    local ip = vec_copy(wp)
-
-    -- rotate
-    ip = vec(SQRT_HALF * (ip.x - ip.y), SQRT_HALF * (ip.x + ip.y))
-
-    -- scale
-    ip.x *= 2
-
-    -- translate to center
-    ip.x += 64
-    ip.y += 64
-
-    return ip
+    local ip = vec(SQRT_HALF * (wp.x - wp.y), SQRT_HALF * (wp.x + wp.y)) -- rotate
+    ip.x *= 2 -- scale
+    return vec_add(ip, vec(64,64)) -- translate to center
 end
 
 function iso_to_world(ip)
-    -- SRT / TRS
-    local wp = vec_copy(ip)
-
-    -- translate from center
-    wp.x -= 64
-    wp.y -= 64
-
-    -- scale
-    wp.x /= 2
-
-    -- rotate
-    wp = vec(SQRT_HALF * (wp.x - wp.y), SQRT_HALF * (wp.x + wp.y))
-
-    return wp
+    local wp = vec_add(ip, vec(-64,-64)) -- translate from center
+    wp.x /= 2 -- scale
+    return vec(SQRT_HALF * (wp.x - wp.y), SQRT_HALF * (wp.x + wp.y)) -- rotate
 end
 
 function _init()

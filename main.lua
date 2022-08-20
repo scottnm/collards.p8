@@ -36,49 +36,26 @@ BookState = {
 }
 
 -- constants
-function TILE_SIZE() return 11.3135 end -- precomputed. after iso xform results in 32x16 iso tile
+function TILE_SIZE() return 11.3135 end -- precomputed; results in 32x16 iso tiles
 function ISO_TILE_WIDTH() return 32 end -- FIXME: still using?
 function ISO_TILE_HEIGHT() return 16 end
 function MAX_TILE_LINE() return 9 end
 function MAX_CAMERA_DISTANCE_FROM_PLAYER() return 20 end
 function TOTAL_PAGE_COUNT() return 10 end
-function MAINGAME_TIME_LIMIT() return 5 * 60 * 30  end -- five minutes worth of ticks
-SQRT_HALF = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
+function MAINGAME_TIME_LIMIT() return 5 * 60 * 30  end -- five minutes in ticks
+SQRT_HALF = 0.70710678118 -- sqrt(0.5); hardcode since sqrt is expensive
 
 function world_to_iso(wp)
-    -- SRT / TRS
-    local ip = vec_copy(wp)
-
-    -- rotate
-    ip = vec(SQRT_HALF * (ip.x - ip.y), SQRT_HALF * (ip.x + ip.y))
-
-    -- scale
-    ip.x *= 2
-
-    -- translate to center
-    ip.x += 64
-    ip.y += 64
-
-    return ip
+    local ip = vec(SQRT_HALF * (wp.x - wp.y), SQRT_HALF * (wp.x + wp.y)) -- rotate
+    ip.x *= 2 -- scale
+    return vec_add(ip, vec(64,64)) -- translate to center
 end
 
 function iso_to_world(ip)
-    -- SRT / TRS
-    local wp = vec_copy(ip)
-
-    -- translate from center
-    wp.x -= 64
-    wp.y -= 64
-
-    -- scale
-    wp.x /= 2
-
-    -- rotate
-    wp = vec(SQRT_HALF * (wp.x - wp.y), SQRT_HALF * (wp.x + wp.y))
-
-    return wp
+    local wp = vec_add(ip, vec(-64,-64)) -- translate from center
+    wp.x /= 2 -- scale
+    return vec(SQRT_HALF * (wp.x - wp.y), SQRT_HALF * (wp.x + wp.y)) -- rotate
 end
-
 
 function _init_main_game()
     g_banner = nil
