@@ -876,7 +876,7 @@ function gen_empty_level(level_id, map_size)
             local cell = {
                 idx = idx,
                 tile = make_tile(is_edge_tile, tile_type),
-                pos = vec(col_offset, row_offset),
+                pos = vec(col_offset - TILE_SIZE()/2, row_offset - TILE_SIZE()/2),
                 collider = { radius = 4 }
             }
 
@@ -978,30 +978,29 @@ end
 
 function move_player(input)
     -- when traveling diagnonally, multiply by the factor sqrt(0.5) to avoid traveling further by going diagonally
-    local sqrt_half = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
     local dx = 0
     local dy = 0
     if input.btn_left then
         if input.btn_up then
-            dx = -2 * sqrt_half
-            dy = -1 * sqrt_half
-        elseif input.btn_down then
-            dx = -2 * sqrt_half
-            dy = sqrt_half
-        else
-            dx = -2
+            dx = -1
             dy = 0
+        elseif input.btn_down then
+            dx = 0
+            dy = 1
+        else
+            dx = -1 * SQRT_HALF
+            dy = 1 * SQRT_HALF
         end
     elseif input.btn_right then
         if input.btn_up then
-            dx = 2 * sqrt_half
-            dy = -1 * sqrt_half
+            dx = 0
+            dy = -1
         elseif input.btn_down then
-            dx = 2 * sqrt_half
-            dy = sqrt_half
-        else
-            dx = 2
+            dx = 1
             dy = 0
+        else
+            dx = 1 * SQRT_HALF
+            dy = -1 * SQRT_HALF
         end
     elseif input.btn_up then
         dx = 0
@@ -1013,6 +1012,7 @@ function move_player(input)
         return
     end
 
+    -- FIXME: remove if not used
     local player_spd = 1.0 -- an arbitrary speed factor to hand tune movement speed to feel good
     dx *= player_spd
     dy *= player_spd
@@ -1202,11 +1202,10 @@ function new_bomb(pos, on_explosion_start)
     }
 
     function gen_explosions(pos)
-        local sqrt_half = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
-        local up_right = vec(2 * sqrt_half, -1 * sqrt_half)
-        local up_left = vec(-2 * sqrt_half, -1 * sqrt_half)
-        local down_right = vec(2 * sqrt_half, 1 * sqrt_half)
-        local down_left = vec(-2 * sqrt_half, 1 * sqrt_half)
+        local up_right = vec(2 * SQRT_HALF, -1 * SQRT_HALF)
+        local up_left = vec(-2 * SQRT_HALF, -1 * SQRT_HALF)
+        local down_right = vec(2 * SQRT_HALF, 1 * SQRT_HALF)
+        local down_left = vec(-2 * SQRT_HALF, 1 * SQRT_HALF)
 
         function gen_explosion(frame, pos)
             return { frame = frame, pos = pos, collider = { radius = 3 } }
