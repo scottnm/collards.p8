@@ -43,6 +43,22 @@ function MAX_TILE_LINE() return 9 end
 function MAX_CAMERA_DISTANCE_FROM_PLAYER() return 20 end
 function TOTAL_PAGE_COUNT() return 10 end
 function MAINGAME_TIME_LIMIT() return 5 * 60 * 30  end -- five minutes worth of ticks
+SQRT_HALF = 0.70710678118 -- sqrt(0.5); hardcode to avoid doing an expensive squareroot every frame
+
+function world_to_iso(wp)
+    -- SRT / TRS
+    local ip = vec_copy(wp)
+
+    -- translate to center
+    ip.x += 64
+    ip.y += 64
+
+    -- rotate
+    ip = vec(SQRT_HALF * (ip.x - ip.y), SQRT_HALF * (ip.x + ip.y))
+
+    -- scale
+    ip.x *= 2
+end
 
 function _init_main_game()
     g_banner = nil
@@ -755,10 +771,11 @@ function gen_maps(num_maps)
 
     -- Now that all interesting cells have been placed, fill in the remaining empty cells with hint arrows
     for map in all(maps) do
-        local iso_finish_cell_pos = map.cells[map.finish_cell_idx].pos
+        local iso_finish_cell_pos = world_to_iso(map.cells[map.finish_cell_idx].pos)
         for cell in all(map.cells) do
             if cell.tile.type == TileType.Empty then
-                local dir_vec = vec_sub(iso_finish_cell_pos, cell.pos)
+                local iso_cell_pos = world_to_iso(cell.pos)
+                local dir_vec = vec_sub(iso_finish_cell_pos, iso_cell_pos)
                 local unit_circle_ratio = atan2(dir_vec.x, -1 * dir_vec.y)
                 local angle_to_finish_point_deg = unit_circle_ratio * 360
 
