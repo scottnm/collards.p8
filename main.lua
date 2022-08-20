@@ -36,7 +36,7 @@ BookState = {
 }
 
 -- constants
-function TILE_SIZE() return 16 end
+function TILE_SIZE() return 11.3135 end -- precomputed. after iso xform results in 32x16 iso tile
 function ISO_TILE_WIDTH() return 32 end -- FIXME: still using?
 function ISO_TILE_HEIGHT() return 16 end
 function MAX_TILE_LINE() return 9 end
@@ -49,18 +49,36 @@ function world_to_iso(wp)
     -- SRT / TRS
     local ip = vec_copy(wp)
 
-    -- translate to center
-    ip.x += 64
-    ip.y += 64
-
     -- rotate
     ip = vec(SQRT_HALF * (ip.x - ip.y), SQRT_HALF * (ip.x + ip.y))
 
     -- scale
     ip.x *= 2
 
+    -- translate to center
+    ip.x += 64
+    ip.y += 64
+
     return ip
 end
+
+function iso_to_world(ip)
+    -- SRT / TRS
+    local wp = vec_copy(ip)
+
+    -- translate from center
+    wp.x -= 64
+    wp.y -= 64
+
+    -- scale
+    wp.x /= 2
+
+    -- rotate
+    wp = vec(SQRT_HALF * (wp.x - wp.y), SQRT_HALF * (wp.x + wp.y))
+
+    return wp
+end
+
 
 function _init_main_game()
     g_banner = nil
