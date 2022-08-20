@@ -437,8 +437,9 @@ function _draw_main_game()
         local frame_idx = get_tile_sprite_frame(cell.tile)
         if frame_idx != nil then
             -- DRAW A THIN BORDER
-            spr(128, cell.pos.x - ISO_TILE_WIDTH()/2, cell.pos.y, 4, 2, false)
-            spr(frame_idx, cell.pos.x - ISO_TILE_WIDTH()/2, cell.pos.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
+            local icp = world_to_iso(cell.pos)
+            spr(128, icp.x - ISO_TILE_WIDTH()/2, icp.y, 4, 2, false)
+            spr(frame_idx, icp.x - ISO_TILE_WIDTH()/2, icp.y - ISO_TILE_HEIGHT()/2, 4, 2, false)
 
             if cell.tile.visible then
                 -- draw the hint arrow if the empty hint cell is visible
@@ -462,7 +463,7 @@ function _draw_main_game()
         end
     end
 
-    -- if the player is standing on their last visited isotile, highlight it
+    -- if the player is standing on their last visited tile, highlight it
     if circ_colliders_overlap(g_player, g_player.last_visited_cell) then
         highlight_cell(g_player.last_visited_cell)
     end
@@ -768,11 +769,11 @@ function gen_maps(num_maps)
 
     -- Now that all interesting cells have been placed, fill in the remaining empty cells with hint arrows
     for map in all(maps) do
-        local iso_finish_cell_pos = world_to_iso(map.cells[map.finish_cell_idx].pos)
+        local finish_cell_iso_pos = world_to_iso(map.cells[map.finish_cell_idx].pos)
         for cell in all(map.cells) do
             if cell.tile.type == TileType.Empty then
-                local iso_cell_pos = world_to_iso(cell.pos)
-                local dir_vec = vec_sub(iso_finish_cell_pos, iso_cell_pos)
+                local cell_iso_pos = world_to_iso(cell.pos)
+                local dir_vec = vec_sub(finish_cell_iso_pos, cell_iso_pos)
                 local unit_circle_ratio = atan2(dir_vec.x, -1 * dir_vec.y)
                 local angle_to_finish_point_deg = unit_circle_ratio * 360
 
@@ -810,8 +811,8 @@ function gen_maps(num_maps)
     final_map.cells[altar_cell_idx].tile = make_tile(true, TileType.Altar)
     final_map.cells[altar_cell_idx].tile.has_book = true
     -- set the final level's entry
-    local final_map_start_iso_idx = select_random_empty_tile_idx_from_map(final_map)
-    final_map.cells[final_map_start_iso_idx].tile = make_tile(true, TileType.FloorEntry)
+    local final_map_start_idx = select_random_empty_tile_idx_from_map(final_map)
+    final_map.cells[final_map_start_idx].tile = make_tile(true, TileType.FloorEntry)
     -- turn every other cell into a stone floor cell
     for cell in all(final_map.cells) do
         if cell.tile.type == TileType.Empty then
@@ -930,7 +931,7 @@ function move_to_level(next_level, start_tile_type)
     -- update the current map
     g_map = g_maps[next_level]
 
-    -- place the player on the center of the iso tile
+    -- place the player on the center of the tile
     local player_start_cell = nil
     for cell in all(g_map.cells) do
         if cell.tile.type == start_tile_type then
@@ -1108,13 +1109,7 @@ function get_cells_under_actor(map, actor)
 end
 
 function is_cell_under_actor(cell, actor)
-    -- divide up an iso-tile into 3 rect colliders
-    local iso_sub_colliders = {
-        { width = 12, height = 12 },
-        { width = 18, height =  9 },
-        { width = 26, height =  5 },
-    }
-
+    -- FIXME: should I use an actor rect collider natively
     -- wrap actor's circle collider with a rect collider for easier collision checks
     local actor_rect_collider = {
         pos = vec(
@@ -1124,14 +1119,14 @@ function is_cell_under_actor(cell, actor)
         height = (actor.collider.radius + actor.collider.radius),
     }
 
-    for sub_collider in all(iso_sub_colliders) do
-        -- center the subcollider in the iso cell
-        sub_collider.pos = vec(cell.pos.x - (sub_collider.width/2), cell.pos.y - (sub_collider.height/2))
-        if rect_colliders_overlap(actor_rect_collider, sub_collider) then
-            return true
-        end
-    end
-    return false
+    -- FIXME: maybe refactor into some helper function?
+    local cell_rect_collider = {
+        pos = vec_sub(cell.pos, vec(TILE_SIZE()/2, TILE_SIZE()/2)),
+        width = TILE_SIZE(),
+        height = TILE_SIZE(),
+    }
+
+    return rect_colliders_overlap(actor_rect_collider, cell_rect_collider)
 end
 
 function rect_colliders_overlap(c1, c2)
@@ -1151,14 +1146,15 @@ function rect_colliders_overlap(c1, c2)
 end
 
 function highlight_cell(cell)
-    local cell_pos_x = cell.pos.x
+    local iso_pos = world_to_iso(cell.pos)
+    local ipx = iso_pos.x
     -- For some reason, I need to subtract '1' from each of the y values. I haven't yet rationalized why. Figure out later.
-    local cell_pos_y = cell.pos.y - 1
+    local ipy = iso_pos.y - 1
     local corners = {
-        vec(cell_pos_x - ISO_TILE_WIDTH()/2, cell_pos_y),
-        vec(cell_pos_x, cell_pos_y - ISO_TILE_HEIGHT()/2),
-        vec(cell_pos_x + ISO_TILE_WIDTH()/2, cell_pos_y),
-        vec(cell_pos_x, cell_pos_y + ISO_TILE_HEIGHT()/2),
+        vec(ipx - ISO_TILE_WIDTH()/2, ipy),
+        vec(ipx, ipy - ISO_TILE_HEIGHT()/2),
+        vec(ipx + ISO_TILE_WIDTH()/2, ipy),
+        vec(ipx, ipy + ISO_TILE_HEIGHT()/2),
     }
 
     line(corners[1].x, corners[1].y, corners[2].x, corners[2].y, Colors.White)
