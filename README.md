@@ -4,6 +4,8 @@ A Pico-8 game for the ["Classic Collards" Game Jam](https://itch.io/jam/culture-
 
 Checkout the [itch.io page](https://scottnm.itch.io/dig-deep) for more info and downloads.
 
+![a gif of the game](promo/quick-demo.gif)
+
 ## Main Team
 
 | | | |
